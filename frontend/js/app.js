@@ -941,6 +941,10 @@ function closeModal() {
 // Live game mejorado
 async function checkLiveGame() {
     try {
+        if (!state.summoner?.id) {
+            $('#btn-live').classList.add('hidden');
+            return;
+        }
         await api(`/api/live/${state.summoner.id}?region=${state.region}`);
         $('#btn-live').classList.remove('hidden');
     } catch {
@@ -950,6 +954,10 @@ async function checkLiveGame() {
 
 async function showLiveGame() {
     try {
+        if (!state.summoner?.id) {
+            showError('No se pudo obtener la información del invocador');
+            return;
+        }
         const live = await api(`/api/live/${state.summoner.id}?region=${state.region}`);
         
         const blue = live.participants.filter(p => p.teamId === 100);
