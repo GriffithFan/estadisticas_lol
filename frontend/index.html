@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoL Stats - Estadísticas de League of Legends</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="https://ddragon.leagueoflegends.com/cdn/14.24.1/img/profileicon/29.png">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-inner">
+                <a href="/" class="logo" id="logo-home">
+                    LoL<span class="logo-accent">Stats</span>
+                </a>
+                
+                <nav class="nav">
+                    <a href="#" class="nav-link" id="nav-tierlist">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z"/></svg>
+                        Tier List
+                    </a>
+                    <a href="#" class="nav-link" id="nav-champions">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 4l7.5 13h-15L12 6z"/></svg>
+                        Campeones
+                    </a>
+                    <a href="#" class="nav-link" id="nav-items">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 15c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
+                        Items
+                    </a>
+                    <a href="#" class="nav-link" id="nav-ranking">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v5H5v-5zm5-6h3v11h-3V10zm5-8h3v19h-3V2z"/></svg>
+                        Ranking
+                    </a>
+                    <a href="#" class="nav-link" id="nav-multisearch">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                        Multi-Search
+                    </a>
+                </nav>
+                
+                <form id="header-search-form" class="search-form header-search hidden">
+                    <select id="header-region" class="region-select">
+                        <option value="la1">LAN</option>
+                        <option value="la2">LAS</option>
+                        <option value="na1">NA</option>
+                        <option value="euw1">EUW</option>
+                        <option value="eun1">EUNE</option>
+                        <option value="kr">KR</option>
+                        <option value="jp1">JP</option>
+                        <option value="br1">BR</option>
+                        <option value="oc1">OCE</option>
+                        <option value="tr1">TR</option>
+                        <option value="ru">RU</option>
+                    </select>
+                    <input type="text" id="header-search-input" class="search-input" placeholder="Buscar jugador..." autocomplete="off">
+                    <button type="submit" class="search-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                        </svg>
+                    </button>
+                </form>
+                
+                <button id="theme-toggle" class="theme-toggle" title="Cambiar tema">
+                    <svg class="theme-icon-dark" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313-12.454z"/></svg>
+                    <svg class="theme-icon-light hidden" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-2a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 1h2v3h-2V1zm0 19h2v3h-2v-3zM3.515 4.929l1.414-1.414L7.05 5.636 5.636 7.05 3.515 4.93zM16.95 18.364l1.414-1.414 2.121 2.121-1.414 1.414-2.121-2.121zm2.121-14.85l1.414 1.415-2.121 2.121-1.414-1.414 2.121-2.121zM5.636 16.95l1.414 1.414-2.121 2.121-1.414-1.414 2.121-2.121zM23 11v2h-3v-2h3zM4 11v2H1v-2h3z"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main -->
+        <main class="main">
+            <!-- Hero -->
+            <section id="hero-section" class="hero active">
+                <div class="hero-bg"></div>
+                <div class="hero-content">
+                    <div class="hero-badge">⚡ Parche 25.24</div>
+                    <h1 class="hero-title">Domina tu <span class="gradient-text">partida</span></h1>
+                    <p class="hero-desc">Estadísticas detalladas, historial de partidas, tier lists y más para mejorar tu gameplay</p>
+                    
+                    <form id="hero-search-form" class="search-form hero-search">
+                        <select id="selected-region" class="region-select">
+                            <option value="la1">LAN</option>
+                            <option value="la2">LAS</option>
+                            <option value="na1">NA</option>
+                            <option value="euw1">EUW</option>
+                            <option value="eun1">EUNE</option>
+                            <option value="kr">KR</option>
+                            <option value="jp1">JP</option>
+                            <option value="br1">BR</option>
+                            <option value="oc1">OCE</option>
+                            <option value="tr1">TR</option>
+                            <option value="ru">RU</option>
+                        </select>
+                        <input type="text" id="hero-search-input" class="search-input" placeholder="Nombre#TAG" autocomplete="off">
+                        <button type="submit" class="search-btn primary">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                            </svg>
+                            Buscar
+                        </button>
+                    </form>
+                    <p class="hero-hint">Ejemplo: Faker#KR1 · T1 Gumayusi#KR1 · Griffith#2302</p>
+                    
+                    <!-- Quick Actions -->
+                    <div class="hero-actions">
+                        <button class="hero-action" onclick="showSection('tierlist')">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z"/></svg>
+                            <span>Tier List</span>
+                        </button>
+                        <button class="hero-action" onclick="showSection('multisearch')">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                            <span>Multi-Search</span>
+                        </button>
+                        <button class="hero-action" onclick="showSection('ranking')">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v5H5v-5zm5-6h3v11h-3V10zm5-8h3v19h-3V2z"/></svg>
+                            <span>Top Ladder</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Loading -->
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Cargando datos...</p>
+            </div>
+
+            <!-- Error -->
+            <div id="error-section" class="error-section hidden">
+                <h2>No encontrado</h2>
+                <p id="error-text">Verifica el nombre y el tag</p>
+                <button id="error-back-btn" class="btn">Volver</button>
+            </div>
+
+            <!-- Profile -->
+            <section id="profile-section" class="profile hidden">
+                <!-- Header del perfil -->
+                <div class="profile-header">
+                    <div class="profile-main">
+                        <div class="profile-icon-wrap">
+                            <img id="profile-icon" src="" alt="" class="profile-icon">
+                            <span id="profile-level" class="profile-level">0</span>
+                        </div>
+                        <div class="profile-info">
+                            <h1 class="profile-name"><span id="profile-name">Jugador</span><span id="profile-tag" class="tag">#TAG</span></h1>
+                            <p class="profile-meta"><span id="profile-region">Región</span> · <span id="profile-update">Actualizado ahora</span></p>
+                        </div>
+                    </div>
+                    <div class="profile-actions">
+                        <button id="btn-update" class="btn-icon" title="Actualizar">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5"/>
+                            </svg>
+                        </button>
+                        <button id="btn-live" class="btn-live hidden"><span class="live-dot"></span>En Vivo</button>
+                    </div>
+                </div>
+
+                <!-- Ranked Cards con iconos -->
+                <div class="ranked-row">
+                    <div class="ranked-card" id="ranked-solo">
+                        <img id="ranked-solo-emblem" src="https://opgg-static.akamaized.net/images/medals_new/default.png" alt="" class="ranked-emblem">
+                        <div class="ranked-info">
+                            <span class="ranked-queue">Solo/Duo</span>
+                            <span id="ranked-solo-tier" class="ranked-tier">Sin clasificar</span>
+                            <span id="ranked-solo-lp" class="ranked-lp"></span>
+                            <span id="ranked-solo-wr" class="ranked-wr"></span>
+                        </div>
+                    </div>
+                    <div class="ranked-card" id="ranked-flex">
+                        <img id="ranked-flex-emblem" src="https://opgg-static.akamaized.net/images/medals_new/default.png" alt="" class="ranked-emblem">
+                        <div class="ranked-info">
+                            <span class="ranked-queue">Flex</span>
+                            <span id="ranked-flex-tier" class="ranked-tier">Sin clasificar</span>
+                            <span id="ranked-flex-lp" class="ranked-lp"></span>
+                            <span id="ranked-flex-wr" class="ranked-wr"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Layout 2 columnas: Sidebar + Matches -->
+                <div class="profile-content">
+                    <!-- Sidebar Izquierda -->
+                    <aside class="profile-sidebar">
+                        <!-- Racha y stats rápidas -->
+                        <div class="sidebar-card streak-card">
+                            <div id="streak-indicator" class="streak-indicator"></div>
+                            <h3 class="sidebar-title">Últimas 20 partidas</h3>
+                            <div class="quick-stats">
+                                <div class="quick-stat">
+                                    <span class="quick-stat-value" id="stat-games">0</span>
+                                    <span class="quick-stat-label">Partidas</span>
+                                </div>
+                                <div class="quick-stat">
+                                    <span class="quick-stat-value" id="stat-winrate">-</span>
+                                    <span class="quick-stat-label">Winrate</span>
+                                </div>
+                                <div class="quick-stat">
+                                    <span class="quick-stat-value" id="stat-kda">-</span>
+                                    <span class="quick-stat-label">KDA</span>
+                                </div>
+                            </div>
+                            <!-- Barra visual de victorias/derrotas -->
+                            <div id="recent-results" class="recent-results"></div>
+                        </div>
+
+                        <!-- Rol más jugado -->
+                        <div class="sidebar-card">
+                            <h3 class="sidebar-title">Posición preferida</h3>
+                            <div id="role-stats" class="role-stats"></div>
+                        </div>
+
+                        <!-- Top Campeones (Estadísticas de temporada) -->
+                        <div class="sidebar-card">
+                            <h3 class="sidebar-title">Campeones más jugados</h3>
+                            <div id="champion-stats-list" class="champion-stats-list"></div>
+                        </div>
+
+                        <!-- Maestría de Campeones -->
+                        <div class="sidebar-card">
+                            <h3 class="sidebar-title">Maestría</h3>
+                            <div id="mastery-list" class="mastery-list"></div>
+                        </div>
+                    </aside>
+
+                    <!-- Contenido Principal - Partidas -->
+                    <div class="profile-main-content">
+                        <div class="section-header">
+                            <h2 class="section-title">Historial de partidas</h2>
+                            <select id="match-queue-filter" class="filter-select">
+                                <option value="all">Todas</option>
+                                <option value="420">Solo/Duo</option>
+                                <option value="440">Flex</option>
+                                <option value="450">ARAM</option>
+                            </select>
+                        </div>
+                        <div id="matches-container" class="matches-list"></div>
+                        <button id="load-more-btn" class="btn btn-secondary hidden">Cargar más partidas</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Champions Section -->
+            <section id="champions-section" class="champions-section hidden">
+                <div class="section-header">
+                    <h2 class="section-title">Todos los Campeones</h2>
+                    <input type="text" id="champ-search" class="search-input" placeholder="Buscar campeón..." style="max-width: 250px;">
+                </div>
+                <div id="champions-grid" class="champions-grid"></div>
+            </section>
+
+            <!-- Items Section -->
+            <section id="items-section" class="items-section hidden">
+                <div class="section-header">
+                    <h2 class="section-title">Items del Juego</h2>
+                    <div class="filters-row">
+                        <input type="text" id="item-search" class="search-input" placeholder="Buscar item..." style="max-width: 250px;">
+                        <select id="item-category" class="filter-select">
+                            <option value="all">Todos</option>
+                            <option value="Damage">Daño</option>
+                            <option value="CriticalStrike">Crítico</option>
+                            <option value="AttackSpeed">Velocidad de Ataque</option>
+                            <option value="LifeSteal">Robo de Vida</option>
+                            <option value="SpellDamage">Poder de Habilidad</option>
+                            <option value="Mana">Maná</option>
+                            <option value="Armor">Armadura</option>
+                            <option value="SpellBlock">Resistencia Mágica</option>
+                            <option value="Health">Vida</option>
+                            <option value="Boots">Botas</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="items-grid" class="items-grid"></div>
+            </section>
+
+            <!-- Ranking Section -->
+            <section id="ranking-section" class="ranking-section hidden">
+                <div class="section-header">
+                    <h2 class="section-title">Ranking Ladder</h2>
+                    <div class="filters-row">
+                        <select id="ranking-region" class="filter-select">
+                            <option value="la1">LAN</option>
+                            <option value="la2">LAS</option>
+                            <option value="na1">NA</option>
+                            <option value="euw1">EUW</option>
+                            <option value="eun1">EUNE</option>
+                            <option value="kr">KR</option>
+                            <option value="jp1">JP</option>
+                            <option value="br1">BR</option>
+                        </select>
+                        <select id="ranking-queue" class="filter-select">
+                            <option value="RANKED_SOLO_5x5">Solo/Duo</option>
+                            <option value="RANKED_FLEX_SR">Flex</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- LP Cutoffs -->
+                <div id="lp-cutoffs" class="lp-cutoffs"></div>
+                <div id="ranking-table" class="ranking-table"></div>
+            </section>
+
+            <!-- Tier List Section -->
+            <section id="tierlist-section" class="tierlist-section hidden">
+                <div class="section-header">
+                    <h2 class="section-title">Tier List - Parche 25.24</h2>
+                    <div class="filters-row">
+                        <select id="tierlist-role" class="filter-select">
+                            <option value="all">Todos los roles</option>
+                            <option value="top">Top</option>
+                            <option value="jungle">Jungla</option>
+                            <option value="mid">Mid</option>
+                            <option value="adc">ADC</option>
+                            <option value="support">Support</option>
+                        </select>
+                        <select id="tierlist-tier" class="filter-select">
+                            <option value="all">Todos los elos</option>
+                            <option value="challenger">Challenger</option>
+                            <option value="master">Master+</option>
+                            <option value="diamond">Diamond+</option>
+                            <option value="emerald">Emerald+</option>
+                            <option value="platinum">Platinum+</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="tierlist-legend">
+                    <span class="tier-badge tier-s">S</span>
+                    <span class="tier-badge tier-a">A</span>
+                    <span class="tier-badge tier-b">B</span>
+                    <span class="tier-badge tier-c">C</span>
+                    <span class="tier-badge tier-d">D</span>
+                </div>
+                <div id="tierlist-container" class="tierlist-container"></div>
+            </section>
+
+            <!-- Multi-Search Section -->
+            <section id="multisearch-section" class="multisearch-section hidden">
+                <div class="section-header">
+                    <h2 class="section-title">👥 Multi-Search</h2>
+                    <p class="section-desc">Busca varios jugadores a la vez - perfecto para champ select</p>
+                </div>
+                <div class="multisearch-form">
+                    <select id="multisearch-region" class="region-select">
+                        <option value="la1">LAN</option>
+                        <option value="la2">LAS</option>
+                        <option value="na1">NA</option>
+                        <option value="euw1">EUW</option>
+                        <option value="eun1">EUNE</option>
+                        <option value="kr">KR</option>
+                        <option value="jp1">JP</option>
+                        <option value="br1">BR</option>
+                    </select>
+                    <textarea id="multisearch-input" class="multisearch-textarea" placeholder="Pega los nombres del lobby aquí...&#10;Ejemplo:&#10;Jugador1#TAG&#10;Jugador2#TAG&#10;Jugador3#TAG"></textarea>
+                    <button id="multisearch-btn" class="btn primary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                        </svg>
+                        Buscar todos
+                    </button>
+                </div>
+                <div id="multisearch-results" class="multisearch-results"></div>
+            </section>
+        </main>
+
+        <!-- Modal -->
+        <div id="match-modal" class="modal hidden">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <button class="modal-close" id="modal-close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+                <div id="modal-body"></div>
+            </div>
+        </div>
+
+        <!-- Tooltip -->
+        <div id="tooltip" class="tooltip"></div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>© 2024-2025 <strong>Griffith_Tech</strong>. Todos los derechos reservados.</p>
+            <p style="margin-top: 8px;">LoL Stats no está afiliado con Riot Games. League of Legends y todos los logos relacionados son marcas registradas de Riot Games, Inc.</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
