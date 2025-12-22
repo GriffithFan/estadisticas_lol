@@ -4,7 +4,7 @@
 
 const state = {
     puuid: null,
-    region: 'la1',
+    region: 'la2',
     gameName: null,
     tagLine: null,
     summoner: null,
@@ -12,9 +12,15 @@ const state = {
     champions: {},
     spells: {},
     items: {},
+    runes: [],
+    runeIndex: {},
     matches: [],
     matchesLoaded: 0,
     championStats: {},
+    championStatsList: [],
+    championStatsExpanded: false,
+    profileSummary: null,
+    profileSummarySeasonYear: null,
     currentSection: 'hero'
 };
 
@@ -96,6 +102,58 @@ const getSpellIcon = id => {
 
 const getProfileIcon = id => `https://ddragon.leagueoflegends.com/cdn/${state.ddragonVersion}/img/profileicon/${id}.png`;
 
+// Utilidad para pausar (backoff)
+const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+
+function getMasteryTooltip(championId) {
+    const mastery = (state.mastery || []).find(m => parseInt(m.championId, 10) === parseInt(championId, 10));
+    if (!mastery) return null;
+    const points = formatNumber(mastery.championPoints || 0);
+    const level = mastery.championLevel || 0;
+    return encodeTooltipData({
+        title: `${getChampionName(championId)} · Maestría ${level}`,
+        desc: `${points} puntos de maestría`
+    });
+}
+
+// Compara entradas de ranked para elegir la de mayor nivel/LP
+function resolveBestEntry(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    const tierOrder = {
+        IRON: 1, BRONZE: 2, SILVER: 3, GOLD: 4, PLATINUM: 5, EMERALD: 6,
+        DIAMOND: 7, MASTER: 8, GRANDMASTER: 9, CHALLENGER: 10
+    };
+    const divOrder = { IV: 1, III: 2, II: 3, I: 4 };
+    const score = (e) => (tierOrder[e.tier] || 0) * 1000 + (divOrder[e.rank] || 0) * 10 + (e.leaguePoints || 0);
+    return score(a) >= score(b) ? a : b;
+}
+
+function buildRuneIndex(runeTrees = []) {
+    const index = {};
+    runeTrees.forEach(tree => {
+        tree.slots?.forEach(slot => {
+            slot.runes?.forEach(rune => {
+                index[rune.id] = {
+                    id: rune.id,
+                    name: rune.name,
+                    icon: `https://ddragon.leagueoflegends.com/cdn/img/${rune.icon}`,
+                    shortDesc: rune.shortDesc
+                };
+            });
+        });
+    });
+    return index;
+}
+
+const getRuneInfo = runeId => runeId ? state.runeIndex?.[runeId] : null;
+
+const getTopEntries = (obj = {}, limit = 3) => Object.entries(obj || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit);
+
+const encodeTooltipData = data => JSON.stringify(data).replace(/"/g, '&quot;');
+
 // Rank emblem - usando CDN de Riot con fallback
 const getRankEmblem = tier => {
     if (!tier) return 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-iron.png';
@@ -113,6 +171,13 @@ const queueNames = {
     900: 'URF',
     1020: 'One for All'
 };
+
+const rankedQueueLabels = {
+    RANKED_SOLO_5x5: 'Solo/Duo',
+    RANKED_FLEX_SR: 'Flex'
+};
+
+const formatTierText = tier => tier ? tier.charAt(0) + tier.slice(1).toLowerCase() : 'Sin clasificar';
 
 const regionNames = {
     br1: 'Brasil', eun1: 'EU Nordic', euw1: 'EU West', jp1: 'Japón',
@@ -156,16 +221,19 @@ async function init() {
         const { version } = await api('/api/ddragon/version');
         state.ddragonVersion = version;
         
-        const [champions, spells, items] = await Promise.all([
+        const [champions, spells, items, runes] = await Promise.all([
             api('/api/ddragon/champions'),
             api('/api/ddragon/spells'),
-            api('/api/ddragon/items')
+            api('/api/ddragon/items'),
+            api('/api/ddragon/runes')
         ]);
         
         state.champions = champions;
         state.spells = spells;
         state.items = items;
-        console.log('App ready, version:', version, '| Items loaded:', Object.keys(items).length);
+        state.runes = runes;
+        state.runeIndex = buildRuneIndex(runes);
+        console.log('App ready, version:', version, '| Items loaded:', Object.keys(items).length, '| Runes:', Object.keys(state.runeIndex).length);
     } catch (err) {
         console.error('Init error:', err);
         state.ddragonVersion = '14.24.1';
@@ -225,6 +293,7 @@ function setupEvents() {
     $('#btn-live')?.addEventListener('click', showLiveGame);
     $('#load-more-btn')?.addEventListener('click', loadMoreMatches);
     $('#match-queue-filter')?.addEventListener('change', filterMatches);
+    $('#champion-stats-toggle')?.addEventListener('click', toggleChampionStatsView);
     
     // Modal
     $('#modal-close')?.addEventListener('click', closeModal);
@@ -369,33 +438,108 @@ async function search(input, region) {
 
 // Cargar perfil
 async function loadProfile() {
-    const [summoner, ranked, matchIds, mastery] = await Promise.all([
+    const seasonYear = new Date().getUTCFullYear();
+    let summary = null;
+    try {
+        summary = await api(`/api/profile/summary/${state.puuid}?region=${state.region}&seasonYear=${seasonYear}`);
+    } catch (err) {
+        console.warn('Summary fetch failed', err);
+    }
+
+    // Datos base obligatorios
+    const [summoner, mastery] = await Promise.all([
         api(`/api/summoner/${state.puuid}?region=${state.region}`),
-        api(`/api/ranked/${state.puuid}?region=${state.region}`),
-        api(`/api/matches/${state.puuid}?region=${state.region}&count=100`),
         api(`/api/mastery/${state.puuid}?region=${state.region}&count=10`).catch(() => [])
     ]);
-    
+
+    // Ranked entries: prefer resumen; si no, pedir ranked con tolerancia a error
+    let rankedEntries = Array.isArray(summary?.ranked?.entries) ? summary.ranked.entries : [];
+    if (!rankedEntries.length) {
+        try {
+            rankedEntries = await api(`/api/ranked/${state.puuid}?region=${state.region}`);
+        } catch (err) {
+            console.warn('Ranked fetch failed', err);
+            rankedEntries = [];
+        }
+    }
+
+    // Match IDs: prefer los del summary; si no, pedir pocos
+    let matchIdList = Array.isArray(summary?.matches) && summary.matches.length ? summary.matches : [];
+    if (!matchIdList.length) {
+        try {
+            matchIdList = await api(`/api/matches/${state.puuid}?region=${state.region}&count=15`);
+        } catch (err) {
+            console.warn('Matches fetch failed', err);
+            matchIdList = [];
+        }
+    }
+
     state.summoner = summoner;
     state.matches = [];
     state.matchesLoaded = 0;
     state.championStats = {};
+    state.championStatsList = [];
+    state.championStatsExpanded = false;
+    state.profileSummarySeasonYear = seasonYear;
     state.mastery = mastery || [];
-    state.allMatchIds = matchIds || [];
+    state.profileSummary = summary || null;
+    state.allMatchIds = matchIdList;
     
     renderProfileHeader(summoner);
-    renderRanked(ranked);
+    renderRanked(rankedEntries);
     renderMasteryList(mastery);
-    
+
+    // Armar y aplicar resumen de ranked (del summary o derivado de entries)
+    let summaryData = summary?.ranked;
+    if (!summaryData && Array.isArray(rankedEntries) && rankedEntries.length) {
+        const totals = rankedEntries.reduce((acc, entry) => {
+            acc.wins += entry.wins || 0;
+            acc.losses += entry.losses || 0;
+            return acc;
+        }, { wins: 0, losses: 0 });
+        const best = rankedEntries.reduce((a, b) => resolveBestEntry(a, b), null);
+        summaryData = { best_queue: best, overall: totals, entries: rankedEntries };
+    }
+    if (summaryData) {
+        applyProfileSummary(summaryData);
+        if (state.profileSummary) {
+            state.profileSummary.ranked = summaryData;
+        } else {
+            state.profileSummary = { ranked: summaryData };
+        }
+    }
+
     $('#matches-container').innerHTML = '';
     $('#champion-stats-list').innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">Calculando estadísticas de temporada...</div>';
-    
-    if (matchIds?.length) {
-        // Cargar primeras 10 para mostrar rápido, luego cargar más en background para stats
-        await loadMatches(matchIds.slice(0, 10));
-        
-        // Cargar el resto en background para estadísticas completas
-        loadAllMatchesForStats(matchIds.slice(10));
+
+    if (matchIdList.length) {
+        // Cargar un bloque inicial mayor (hasta 10) para mostrar historial útil
+        await loadMatches(matchIdList.slice(0, 10));
+    } else {
+        $('#matches-container').innerHTML = '<div style="padding:16px; color: var(--text-muted);">Sin partidas recientes disponibles.</div>';
+    }
+
+    if (summary?.champions?.length) {
+        setChampionStatsFromSummary(summary.champions);
+        renderChampionStatsList();
+    } else {
+        state.championStatsList = [];
+        renderChampionStatsList();
+        // Si no llegaron stats pero ya cargamos partidas, derivar
+        if (state.matches.length) {
+            deriveChampionStatsFromMatches();
+            renderChampionStatsList();
+        }
+    }
+
+    // Si no había matchIds pero el summary trae matches, cargarlos
+    if (!matchIdList.length && summary?.matches?.length) {
+        state.allMatchIds = summary.matches;
+        await loadMatches(summary.matches.slice(0, 10));
+        if (!summary?.champions?.length) {
+            deriveChampionStatsFromMatches();
+            renderChampionStatsList();
+        }
     }
     
     checkLiveGame();
@@ -414,11 +558,16 @@ function renderProfileHeader(summoner) {
 }
 
 function renderRanked(entries) {
+    if ((!entries || !entries.length) && state.profileSummary?.ranked?.entries?.length) {
+        entries = state.profileSummary.ranked.entries;
+    }
+    entries = entries || [];
     const solo = entries.find(e => e.queueType === 'RANKED_SOLO_5x5');
     const flex = entries.find(e => e.queueType === 'RANKED_FLEX_SR');
     
     renderRankedCard('solo', solo);
     renderRankedCard('flex', flex);
+    updateProfileHighlightsFromEntries(entries, solo, flex);
 }
 
 function renderRankedCard(type, data) {
@@ -434,7 +583,6 @@ function renderRankedCard(type, data) {
     
     if (data) {
         const rankImg = getRankEmblem(data.tier);
-        console.log(`Setting ${type} emblem:`, rankImg);
         emblem.src = rankImg;
         emblem.style.display = 'block';
         emblem.style.opacity = '1';
@@ -455,6 +603,153 @@ function renderRankedCard(type, data) {
     }
 }
 
+function updateProfileHighlightsFromEntries(entries = [], solo, flex) {
+    const eloEl = $('#profile-elo');
+    const eloDetailsEl = $('#profile-elo-details');
+    const winrateEl = $('#profile-overall-winrate');
+    const recordEl = $('#profile-overall-record');
+    const emblemImg = $('#profile-elo-emblem');
+    if (!eloEl || !eloDetailsEl || !winrateEl || !recordEl) return;
+    
+    const bestQueue = solo || flex || entries[0];
+    if (bestQueue) {
+        const tierText = formatTierText(bestQueue.tier || '');
+        eloEl.textContent = `${tierText} ${bestQueue.rank || ''}`.trim();
+        eloDetailsEl.textContent = `${bestQueue.leaguePoints || 0} LP · ${rankedQueueLabels[bestQueue.queueType] || 'Clasificatoria'}`;
+        if (emblemImg) {
+            emblemImg.src = getRankEmblem(bestQueue.tier);
+            emblemImg.style.opacity = '1';
+        }
+    } else {
+        eloEl.textContent = 'Sin clasificar';
+        eloDetailsEl.textContent = 'Sin ranked esta temporada';
+        if (emblemImg) {
+            emblemImg.src = getRankEmblem('iron');
+            emblemImg.style.opacity = '0.35';
+        }
+    }
+    
+    let totals = entries.reduce((acc, entry) => {
+        acc.wins += entry.wins || 0;
+        acc.losses += entry.losses || 0;
+        return acc;
+    }, { wins: 0, losses: 0 });
+    let totalGames = totals.wins + totals.losses;
+    let isRankedData = true;
+    // Si no hay ranked entries, derivar de champion stats
+    if (totalGames === 0 && state.profileSummary?.champions?.length) {
+        const champs = state.profileSummary.champions;
+        totals.wins = champs.reduce((sum, c) => sum + (c.wins || 0), 0);
+        const games = champs.reduce((sum, c) => sum + (c.games || 0), 0);
+        totals.losses = games - totals.wins;
+        totalGames = games;
+        isRankedData = false;
+    }
+    if (totalGames > 0) {
+        const wr = Math.round((totals.wins / totalGames) * 100);
+        winrateEl.textContent = `${wr}%`;
+        winrateEl.style.color = wr >= 50 ? 'var(--win)' : 'var(--loss)';
+        const label = isRankedData ? 'clasificatorias' : 'partidas';
+        recordEl.textContent = `${totals.wins}W · ${totals.losses}L (${totalGames} ${label})`;
+    } else {
+        winrateEl.textContent = '-';
+        winrateEl.style.color = 'var(--text)';
+        recordEl.textContent = 'Sin partidas registradas';
+    }
+}
+
+function applyProfileSummary(summary) {
+    const best = summary?.best_queue;
+    const totals = summary?.overall || {};
+    const eloEl = $('#profile-elo');
+    const eloDetailsEl = $('#profile-elo-details');
+    const winrateEl = $('#profile-overall-winrate');
+    const recordEl = $('#profile-overall-record');
+    const emblemImg = $('#profile-elo-emblem');
+    if (!eloEl || !eloDetailsEl || !winrateEl || !recordEl) return;
+    if (best) {
+        const tierText = formatTierText(best.tier || '');
+        eloEl.textContent = `${tierText} ${best.rank || ''}`.trim();
+        eloDetailsEl.textContent = `${best.leaguePoints || 0} LP · ${rankedQueueLabels[best.queueType] || 'Clasificatoria'}`;
+        if (emblemImg) {
+            const emblemUrl = getRankEmblem(best.tier);
+            emblemImg.src = emblemUrl;
+            emblemImg.style.opacity = '1';
+        }
+    } else {
+        eloEl.textContent = 'Sin clasificar';
+        eloDetailsEl.textContent = 'Sin ranked esta temporada';
+        if (emblemImg) {
+            emblemImg.src = getRankEmblem('iron');
+            emblemImg.style.opacity = '0.35';
+        }
+    }
+    // Ranked totals
+    let wins = totals.wins || 0;
+    let losses = totals.losses || 0;
+    let totalGames = wins + losses;
+    let isRankedData = true;
+    // Si no hay ranked entries, derivar de champion stats (todas las partidas)
+    if (totalGames === 0 && state.profileSummary?.champions?.length) {
+        const champs = state.profileSummary.champions;
+        wins = champs.reduce((sum, c) => sum + (c.wins || 0), 0);
+        const games = champs.reduce((sum, c) => sum + (c.games || 0), 0);
+        losses = games - wins;
+        totalGames = games;
+        isRankedData = false;
+    }
+    if (totalGames > 0) {
+        const wr = Math.round((wins / totalGames) * 100);
+        winrateEl.textContent = `${wr}%`;
+        winrateEl.style.color = wr >= 50 ? 'var(--win)' : 'var(--loss)';
+        const label = isRankedData ? 'clasificatorias' : 'partidas';
+        recordEl.textContent = `${wins}W · ${losses}L (${totalGames} ${label})`;
+    } else {
+        winrateEl.textContent = '-';
+        winrateEl.style.color = 'var(--text)';
+        recordEl.textContent = 'Sin partidas registradas';
+    }
+}
+
+function setChampionStatsFromSummary(champions = []) {
+    state.championStats = {};
+    state.championStatsList = champions || [];
+    state.championStatsExpanded = false;
+    (champions || []).forEach(champ => {
+        const itemCounts = {};
+        (champ.items || []).forEach(item => {
+            if (item?.id) itemCounts[item.id] = item.count;
+        });
+        const spellPairs = {};
+        (champ.spells || []).forEach(spell => {
+            if (Array.isArray(spell.ids) && spell.ids.length === 2) {
+                const ids = [...spell.ids].sort((a, b) => a - b);
+                spellPairs[ids.join('-')] = spell.count;
+            }
+        });
+        const keystones = {};
+        (champ.keystones || []).forEach(perk => {
+            if (perk?.id) keystones[perk.id] = perk.count;
+        });
+        state.championStats[champ.championId] = {
+            championId: champ.championId,
+            games: champ.games,
+            wins: champ.wins,
+            kills: champ.kills,
+            deaths: champ.deaths,
+            assists: champ.assists,
+            cs: champ.cs,
+            duration: champ.duration,
+            damage: champ.damage,
+            gold: champ.gold,
+            vision: champ.vision,
+            itemCounts,
+            spellPairs,
+            keystones
+        };
+    });
+}
+
 // Renderizar lista de maestría
 function renderMasteryList(masteries) {
     const container = $('#mastery-list');
@@ -469,9 +764,13 @@ function renderMasteryList(masteries) {
         const champId = m.championId;
         const points = formatNumber(m.championPoints || 0);
         const level = m.championLevel || 0;
+        const tooltip = encodeTooltipData({
+            title: `${getChampionName(champId)} · M${level}`,
+            desc: `${points} puntos`
+        });
         
         return `
-            <div class="mastery-item" data-champion-id="${champId}">
+            <div class="mastery-item" data-champion-id="${champId}" data-tooltip="${tooltip}">
                 <img src="${getChampionIcon(champId)}" alt="" class="mastery-icon">
                 <div class="mastery-info">
                     <div class="mastery-name">${getChampionName(champId)}</div>
@@ -489,92 +788,90 @@ function renderMasteryList(masteries) {
     });
 }
 
-// Cargar todas las partidas para estadísticas
-async function loadAllMatchesForStats(matchIds) {
-    if (!matchIds || matchIds.length === 0) return;
-    
-    for (const id of matchIds) {
-        try {
-            const match = await api(`/api/match/${id}?region=${state.region}`);
-            updateChampionStats(match);
-        } catch (err) {
-            // Silently ignore errors for background loading
-        }
-    }
-    
-    // Actualizar la lista de estadísticas de campeones cuando termine
-    renderChampionStatsList();
-}
-
 // Partidas
 async function loadMatches(matchIds) {
     const container = $('#matches-container');
-    
+    let rateLimited = false;
+
     for (const id of matchIds) {
-        try {
-            const match = await api(`/api/match/${id}?region=${state.region}`);
-            state.matches.push(match);
-            container.appendChild(createMatchCard(match));
-            state.matchesLoaded++;
-            updateChampionStats(match);
-        } catch (err) {
-            console.error(`Error loading match ${id}:`, err);
+        let match = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                match = await api(`/api/match/${id}?region=${state.region}`);
+                break;
+            } catch (err) {
+                const is429 = String(err.message || '').includes('429') || /HTTP 429/.test(err.message || '');
+                if (is429) {
+                    rateLimited = true;
+                    await sleep(800 * (attempt + 1));
+                    continue;
+                }
+                console.error(`Error loading match ${id}:`, err);
+                break;
+            }
         }
+        if (!match) continue;
+        state.matches.push(match);
+        container.appendChild(createMatchCard(match));
+        state.matchesLoaded++;
+        // pequeña pausa para evitar ráfaga
+        await sleep(120);
+        if (rateLimited) break;
     }
-    
+
+    if (rateLimited && !state.matches.length) {
+        container.innerHTML = '<div style="padding:16px; color: var(--loss);">Riot limitó las peticiones (429). Intenta de nuevo en unos segundos.</div>';
+    }
+
     updateStats();
-    renderChampionStatsList();
     updateRecentResults();
     updateRoleStats();
-    $('#load-more-btn').classList.toggle('hidden', state.matchesLoaded >= 20);
-}
-
-function updateChampionStats(match) {
-    const me = match.info.participants.find(p => p.puuid === state.puuid);
-    if (!me) return;
-    
-    const champId = me.championId;
-    if (!state.championStats[champId]) {
-        state.championStats[champId] = { games: 0, wins: 0, kills: 0, deaths: 0, assists: 0, cs: 0, duration: 0 };
-    }
-    
-    const stats = state.championStats[champId];
-    stats.games++;
-    if (me.win) stats.wins++;
-    stats.kills += me.kills;
-    stats.deaths += me.deaths;
-    stats.assists += me.assists;
-    stats.cs += me.totalMinionsKilled + me.neutralMinionsKilled;
-    stats.duration += match.info.gameDuration;
+    $('#load-more-btn').classList.toggle('hidden', state.matchesLoaded >= 30);
 }
 
 function renderChampionStatsList() {
     const container = $('#champion-stats-list');
+    const toggleBtn = $('#champion-stats-toggle');
+    const seasonLabel = $('#champion-stats-season');
     if (!container) return;
-    
-    const sorted = Object.entries(state.championStats)
-        .sort((a, b) => b[1].games - a[1].games)
-        .slice(0, 7);
-    
-    if (sorted.length === 0) {
+    const champions = state.championStatsList || [];
+    if (seasonLabel && state.profileSummarySeasonYear) {
+        seasonLabel.textContent = `Temporada ${state.profileSummarySeasonYear}`;
+    }
+
+    if (!champions.length) {
         container.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-muted);">Sin datos</div>';
+        if (toggleBtn) toggleBtn.classList.add('hidden');
         return;
     }
-    
-    container.innerHTML = sorted.map(([champId, stats]) => {
+
+    const limit = state.championStatsExpanded ? champions.length : Math.min(10, champions.length);
+    const subset = champions.slice(0, limit);
+
+    container.innerHTML = subset.map(champ => {
+        const champId = champ.championId;
+        const stats = state.championStats[champId] || champ;
         const wr = Math.round((stats.wins / stats.games) * 100);
+        const losses = stats.games - stats.wins;
         const kda = stats.deaths === 0 ? 'Perfect' : ((stats.kills + stats.assists) / stats.deaths).toFixed(1);
         const wrClass = wr >= 55 ? 'good' : (wr <= 45 ? 'bad' : '');
+        const csMin = stats.duration ? (stats.cs / (stats.duration / 60)).toFixed(1) : '0.0';
+        const avgDamage = stats.games ? formatNumber(Math.round(stats.damage / stats.games)) : '0';
+        const masteryTip = getMasteryTooltip(champId);
         
         return `
-            <div class="champ-stat-item" data-champion-id="${champId}">
+            <div class="champ-stat-item" data-champion-id="${champId}" ${masteryTip ? `data-tooltip='${masteryTip}'` : ''}>
                 <img src="${getChampionIcon(champId)}" alt="" class="champ-stat-icon">
                 <div class="champ-stat-info">
                     <div class="champ-stat-name">${getChampionName(champId)}</div>
                     <div class="champ-stat-details">
                         <span class="champ-stat-wr ${wrClass}">${wr}% WR</span>
                         <span class="champ-stat-kda">${kda} KDA</span>
-                        <span>${stats.games}G</span>
+                        <span class="champ-stat-games">${stats.games}G (${stats.wins}V-${losses}L)</span>
+                    </div>
+                    <div class="champ-stat-extra">
+                        <span>${csMin} CS/min</span>
+                        <span>${avgDamage} dmg</span>
                     </div>
                 </div>
             </div>
@@ -584,6 +881,16 @@ function renderChampionStatsList() {
     container.querySelectorAll('.champ-stat-item').forEach(item => {
         item.addEventListener('click', () => showChampionModal(item.dataset.championId));
     });
+
+    if (toggleBtn) {
+        toggleBtn.classList.toggle('hidden', champions.length <= 10);
+        toggleBtn.textContent = state.championStatsExpanded ? 'Ver menos' : 'Ver más';
+    }
+}
+
+function toggleChampionStatsView() {
+    state.championStatsExpanded = !state.championStatsExpanded;
+    renderChampionStatsList();
 }
 
 function createMatchCard(match) {
@@ -708,6 +1015,46 @@ function updateStats() {
     $('#stat-games').textContent = games;
 }
 
+// Deriva estadísticas de campeones a partir de las partidas cargadas (fallback)
+function deriveChampionStatsFromMatches() {
+    const champMap = {};
+    state.matches.forEach(match => {
+        const me = match?.info?.participants?.find(p => p.puuid === state.puuid);
+        if (!me) return;
+        const champId = parseInt(me.championId, 10);
+        if (!champId) return;
+        const entry = champMap[champId] || {
+            championId: champId,
+            games: 0,
+            wins: 0,
+            kills: 0,
+            deaths: 0,
+            assists: 0,
+            cs: 0,
+            duration: 0,
+            damage: 0,
+            gold: 0,
+            vision: 0
+        };
+        entry.games += 1;
+        entry.wins += me.win ? 1 : 0;
+        entry.kills += me.kills || 0;
+        entry.deaths += me.deaths || 0;
+        entry.assists += me.assists || 0;
+        entry.cs += (me.totalMinionsKilled || 0) + (me.neutralMinionsKilled || 0);
+        entry.duration += match.info?.gameDuration || 0;
+        entry.damage += me.totalDamageDealtToChampions || 0;
+        entry.gold += me.goldEarned || 0;
+        entry.vision += me.visionScore || 0;
+        champMap[champId] = entry;
+    });
+
+    const list = Object.values(champMap).sort((a, b) => b.games - a.games);
+    state.championStats = champMap;
+    state.championStatsList = list;
+    state.championStatsExpanded = false;
+}
+
 async function loadMoreMatches() {
     const btn = $('#load-more-btn');
     btn.textContent = 'Cargando...';
@@ -813,6 +1160,9 @@ function showMatchDetail(match) {
 // Champion Modal
 function showChampionModal(championId) {
     const champ = getChampionById(championId);
+    const summaryEntry = state.profileSummary?.champions?.find(
+        c => String(c.championId) === String(championId)
+    );
     const stats = state.championStats[championId];
     
     let statsHtml = '';
@@ -822,7 +1172,10 @@ function showChampionModal(championId) {
         const avgKills = (stats.kills / stats.games).toFixed(1);
         const avgDeaths = (stats.deaths / stats.games).toFixed(1);
         const avgAssists = (stats.assists / stats.games).toFixed(1);
-        const csMin = (stats.cs / (stats.duration / 60)).toFixed(1);
+        const csMin = stats.duration ? (stats.cs / (stats.duration / 60)).toFixed(1) : '0.0';
+        const avgDamage = stats.games ? formatNumber(Math.round(stats.damage / stats.games)) : '0';
+        const avgGold = stats.games ? formatNumber(Math.round(stats.gold / stats.games)) : '0';
+        const vision = stats.games ? (stats.vision / stats.games).toFixed(1) : '0.0';
         
         const wrClass = wr >= 55 ? 'good' : (wr <= 45 ? 'bad' : '');
         
@@ -845,11 +1198,20 @@ function showChampionModal(championId) {
                     <span class="champ-stat-val">${csMin}</span>
                     <span class="champ-stat-label">CS/min</span>
                 </div>
+                <div class="champ-stat-card">
+                    <span class="champ-stat-val">${avgDamage}</span>
+                    <span class="champ-stat-label">Daño</span>
+                </div>
+                <div class="champ-stat-card">
+                    <span class="champ-stat-val">${avgGold}</span>
+                    <span class="champ-stat-label">Oro</span>
+                </div>
             </div>
             <div style="display: flex; gap: 20px; justify-content: center; color: var(--text-secondary); font-size: 0.9rem;">
                 <span><strong style="color: var(--win)">${avgKills}</strong> Kills</span>
                 <span><strong style="color: var(--loss)">${avgDeaths}</strong> Deaths</span>
                 <span><strong style="color: var(--text)">${avgAssists}</strong> Assists</span>
+                <span><strong style="color: var(--text)">${vision}</strong> Visión</span>
             </div>
         `;
     } else {
@@ -857,7 +1219,7 @@ function showChampionModal(championId) {
     }
     
     // Generar builds recomendadas (basadas en datos populares)
-    const buildsHtml = generateBuildsSection(championId);
+    const buildsHtml = generateBuildsSection(championId, summaryEntry);
     
     $('#modal-body').innerHTML = `
         <div class="champ-modal-header">
@@ -876,23 +1238,90 @@ function showChampionModal(championId) {
 }
 
 // Generar sección de builds recomendadas
-function generateBuildsSection(championId) {
-    // Items populares por tipo de campeón (simplificado)
+function generateBuildsSection(championId, summaryEntry) {
+    const stats = state.championStats[championId];
+    const playerBuild = generatePlayerBuildSection(summaryEntry, stats);
+    if (playerBuild) return playerBuild;
+    return generateFallbackBuildSection(championId);
+}
+
+function generatePlayerBuildSection(summaryEntry, stats) {
+    const games = summaryEntry?.games ?? stats?.games ?? 0;
+    if (games < 2) return null;
+
+    const items = (summaryEntry?.items || []).filter(item => item?.id);
+    const spells = summaryEntry?.spells || [];
+    const keystones = summaryEntry?.keystones || [];
+
+    const topItems = items.slice(0, 6);
+    const spellPair = spells[0];
+    const keystone = keystones[0];
+
+    const keystoneInfo = keystone ? getRuneInfo(Number(keystone.id)) : null;
+    const keystonePick = keystone && games ? Math.round((keystone.count / games) * 100) : 0;
+    const spellPick = spellPair && games ? Math.round((spellPair.count / games) * 100) : 0;
+    const spellIds = Array.isArray(spellPair?.ids) ? spellPair.ids : [];
+
+    const itemsContent = topItems.length
+        ? topItems.map(item => {
+            const pick = games ? Math.round((item.count / games) * 100) : 0;
+            return `
+                <div class="build-item-wrapper" style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:48px;">
+                    <img src="${getItemIcon(item.id)}" alt="item ${item.id}" class="build-item" onerror="this.style.display='none'">
+                    <span style="font-size:0.75rem;color:var(--text-muted);">${pick}%</span>
+                </div>
+            `;
+        }).join('')
+        : '<span>Sin items registrados</span>';
+
+    return `
+        <div class="builds-section">
+            <h3 class="builds-title">Build basada en tus últimas ${games} partidas</h3>
+            <div class="build-row">
+                <div class="build-category">
+                    <span class="build-label">Runa más usada</span>
+                    ${keystoneInfo ? `
+                        <div class="rune-display">
+                            <img src="${keystoneInfo.icon}" alt="${keystoneInfo.name}" class="keystone-icon">
+                            <div>
+                                <span>${keystoneInfo.name}</span>
+                                <small style="display:block;color:var(--text-muted);">${keystonePick}% de las partidas</small>
+                            </div>
+                        </div>
+                    ` : '<span>Sin datos</span>'}
+                </div>
+                <div class="build-category">
+                    <span class="build-label">Hechizos favoritos</span>
+                    ${spellIds.length ? `
+                        <div class="spell-row">
+                            ${spellIds.map(id => `<img src="${getSpellIcon(id)}" class="build-spell" alt="spell ${id}">`).join('')}
+                        </div>
+                        <small style="display:block;color:var(--text-muted);margin-top:4px;">${spellPick}% de las partidas</small>
+                    ` : '<span>Sin datos</span>'}
+                </div>
+            </div>
+            <div class="build-category" style="margin-top: 12px;">
+                <span class="build-label">Items más frecuentes</span>
+                <div class="items-row">
+                    ${itemsContent}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function generateFallbackBuildSection(championId) {
     const champ = getChampionById(championId);
     const tags = champ?.tags || ['Fighter'];
-    
-    // Items comunes por rol
     const itemsByRole = {
-        Assassin: [3142, 6693, 6676, 3814, 6694, 3158],  // Youmuu, Hubris, Collector, Edge, Serylda, Ionian
-        Fighter: [3078, 3053, 6333, 3071, 3748, 3111],   // Trinity, Sterak, Death's Dance, Cleaver, Titanic, Mercs
-        Mage: [3089, 3157, 3135, 4645, 3116, 3020],      // Rabadon, Zhonya, Void, Shadowflame, Rylai, Sorcs
-        Marksman: [6672, 3031, 3094, 3085, 3046, 3006],  // Kraken, IE, RFC, Runaan, Phantom, Zerks
-        Support: [3853, 3860, 3857, 3190, 3107, 3158],   // Shard, Solstice, Zaz'Zak, Locket, Redemption, Ionian
-        Tank: [3075, 3068, 3143, 3742, 3065, 3047],      // Thornmail, Sunfire, Randuin, Dead Man, Spirit, Tabis
+        Assassin: [3142, 6693, 6676, 3814, 6694, 3158],
+        Fighter: [3078, 3053, 6333, 3071, 3748, 3111],
+        Mage: [3089, 3157, 3135, 4645, 3116, 3020],
+        Marksman: [6672, 3031, 3094, 3085, 3046, 3006],
+        Support: [3853, 3860, 3857, 3190, 3107, 3158],
+        Tank: [3075, 3068, 3143, 3742, 3065, 3047],
         default: [3078, 3053, 6333, 3071, 3748, 3111]
     };
-    
-    // Runas populares por rol
     const runesByRole = {
         Assassin: { primary: 'Electrocute', secondary: 'Sorcery', keystone: 'https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/Domination/Electrocute/Electrocute.png' },
         Fighter: { primary: 'Conqueror', secondary: 'Resolve', keystone: 'https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/Precision/Conqueror/Conqueror.png' },
@@ -902,14 +1331,13 @@ function generateBuildsSection(championId) {
         Tank: { primary: 'Grasp', secondary: 'Precision', keystone: 'https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/Resolve/GraspOfTheUndying/GraspOfTheUndying.png' },
         default: { primary: 'Conqueror', secondary: 'Resolve', keystone: 'https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/Precision/Conqueror/Conqueror.png' }
     };
-    
     const role = tags[0] || 'default';
     const items = itemsByRole[role] || itemsByRole.default;
     const runes = runesByRole[role] || runesByRole.default;
     
     return `
         <div class="builds-section">
-            <h3 class="builds-title">Build Recomendada</h3>
+            <h3 class="builds-title">Build recomendada (genérica)</h3>
             <div class="build-row">
                 <div class="build-category">
                     <span class="build-label">Runa Principal</span>
@@ -1230,7 +1658,7 @@ function showItemModal(itemId) {
 
 // Ranking Section
 async function loadRanking() {
-    const region = $('#ranking-region')?.value || 'la1';
+    const region = $('#ranking-region')?.value || 'la2';
     const queue = $('#ranking-queue')?.value || 'RANKED_SOLO_5x5';
     
     const table = $('#ranking-table');
@@ -1239,71 +1667,82 @@ async function loadRanking() {
     if (!table) return;
     
     table.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);">Cargando ranking...</div>';
-    lpCutoffs.innerHTML = '';
+    if (lpCutoffs) lpCutoffs.innerHTML = '';
     
     try {
-        const [challenger, grandmaster] = await Promise.all([
-            api(`/api/league/challenger?region=${region}&queue=${queue}`),
-            api(`/api/league/grandmaster?region=${region}&queue=${queue}`)
-        ]);
-        
-        const challengers = challenger.entries || [];
-        const grandmasters = grandmaster.entries || [];
-        
-        const minChallengerLP = challengers.length > 0 ? Math.min(...challengers.map(e => e.leaguePoints)) : 0;
-        const minGrandmasterLP = grandmasters.length > 0 ? Math.min(...grandmasters.map(e => e.leaguePoints)) : 0;
-        
-        lpCutoffs.innerHTML = `
-            <div class="lp-cutoff">
-                <span class="cutoff-label">LP mínimo Challenger</span>
-                <span class="cutoff-value">${minChallengerLP} LP</span>
-            </div>
-            <div class="lp-cutoff">
-                <span class="cutoff-label">LP mínimo Grandmaster</span>
-                <span class="cutoff-value">${minGrandmasterLP} LP</span>
-            </div>
-        `;
-        
-        const allPlayers = [
-            ...challengers.map(e => ({...e, tier: 'Challenger'})), 
-            ...grandmasters.map(e => ({...e, tier: 'Grandmaster'}))
-        ].sort((a, b) => b.leaguePoints - a.leaguePoints).slice(0, 100);
-        
+        const ranking = await api(`/api/ranking/top?region=${region}&queue=${queue}`);
+        const players = ranking?.players || [];
+        const cutoffs = ranking?.cutoffs || {};
+
+        if (lpCutoffs) {
+            lpCutoffs.innerHTML = `
+                <div class="lp-cutoff">
+                    <span class="cutoff-label">LP mínimo Challenger</span>
+                    <span class="cutoff-value">${cutoffs.challenger ?? 'N/A'} LP</span>
+                </div>
+                <div class="lp-cutoff">
+                    <span class="cutoff-label">LP mínimo Grandmaster</span>
+                    <span class="cutoff-value">${cutoffs.grandmaster ?? 'N/A'} LP</span>
+                </div>
+            `;
+        }
+
+        if (!players.length) {
+            table.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);">No se encontraron jugadores para esta cola.</div>';
+            return;
+        }
+
         let html = `
             <div class="ranking-row header">
                 <div>#</div>
                 <div></div>
                 <div>Invocador</div>
+                <div style="text-align: center">Partidas</div>
                 <div style="text-align: right">LP</div>
                 <div style="text-align: right">WR%</div>
             </div>
         `;
-        
-        allPlayers.forEach((player, index) => {
-            const pos = index + 1;
-            const wr = Math.round((player.wins / (player.wins + player.losses)) * 100);
-            const name = player.summonerName || player.riotIdGameName || `Jugador ${pos}`;
-            const tierLower = player.tier.toLowerCase();
-            
+
+        const fallbackVersion = state.ddragonVersion || 'latest';
+
+        players.forEach((player, index) => {
+            const pos = player.position || index + 1;
+            const wins = player.wins || 0;
+            const losses = player.losses || 0;
+            const games = wins + losses;
+            const wr = games ? Math.round((wins / games) * 100) : 0;
+            const name = player.displayName || player.summonerName || `Jugador ${pos}`;
+            const level = player.summonerLevel || '';
+            const iconUrl = player.profileIconUrl
+                || (player.profileIconId ? getProfileIcon(player.profileIconId) : `https://ddragon.leagueoflegends.com/cdn/${fallbackVersion}/img/profileicon/29.png`);
+            const tierText = formatTierText(player.tier);
+            const wrClass = wr >= 55 ? 'good' : (wr <= 45 ? 'bad' : '');
+
             html += `
                 <div class="ranking-row">
                     <div class="rank-pos ${pos <= 3 ? 'top3' : ''}">${pos}</div>
                     <img src="${getRankEmblem(player.tier)}" class="rank-emblem" onerror="this.style.display='none'">
                     <div class="rank-player">
-                        <span class="rank-name">${name}</span>
-                        <span class="rank-tier-label">${player.tier}</span>
+                        <img src="${iconUrl}" class="rank-player-icon" alt="${name}">
+                        <div class="rank-player-info">
+                            <span class="rank-name">${name}</span>
+                            <span class="rank-tier-label">${tierText}${level ? ` - Nv.${level}` : ''}</span>
+                        </div>
                     </div>
+                    <div class="rank-games">${games} (${wins}V-${losses}L)</div>
                     <div class="rank-lp">${player.leaguePoints} LP</div>
-                    <div class="rank-wr">${wr}%</div>
+                    <div class="rank-wr ${wrClass}">${wr}%</div>
                 </div>
             `;
         });
-        
+
         table.innerHTML = html;
-        
     } catch (err) {
         console.error('Error loading ranking:', err);
         table.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);">Error al cargar el ranking.</div>';
+        if (lpCutoffs) {
+            lpCutoffs.innerHTML = '<div class="lp-cutoff" style="color: var(--loss);">Sin datos disponibles</div>';
+        }
     }
 }
 
@@ -1347,9 +1786,8 @@ function loadTierList() {
     if (!container) return;
     
     const role = $('#tierlist-role')?.value || 'all';
+    const tierFilter = $('#tierlist-tier')?.value || 'all';
     
-    // Datos simulados de tier list (en producción se obtendrían de un API)
-    // Basado en winrates y pick rates típicos
     const tierData = generateTierListData(role);
     
     const tiers = ['S', 'A', 'B', 'C', 'D'];
@@ -1361,18 +1799,40 @@ function loadTierList() {
         'D': 'tier-d'
     };
     
-    container.innerHTML = tiers.map(tier => {
+    const tierDescriptions = {
+        'S': 'Meta dominante - Alta prioridad de pick/ban',
+        'A': 'Muy fuerte - Opciones solidas para rankear',
+        'B': 'Balanceado - Funcional en manos experimentadas',
+        'C': 'Por debajo del promedio - Requiere dominio del campeon',
+        'D': 'Debil en el meta - No recomendado para rankear'
+    };
+    
+    // Filtrar por tier si es necesario
+    const tiersToShow = tierFilter === 'all' ? tiers : [tierFilter];
+    
+    container.innerHTML = tiersToShow.map(tier => {
         const champs = tierData[tier] || [];
+        if (!champs.length) return '';
+        
         return `
             <div class="tier-row">
-                <div class="tier-label ${tierColors[tier]}">${tier}</div>
+                <div class="tier-label-container">
+                    <div class="tier-label ${tierColors[tier]}">${tier}</div>
+                    <div class="tier-description">${tierDescriptions[tier]}</div>
+                </div>
                 <div class="tier-champions">
                     ${champs.map(c => `
                         <div class="tier-champ" data-champion-id="${c.key}" onclick="showChampionModal('${c.key}')">
                             <img src="https://ddragon.leagueoflegends.com/cdn/${state.ddragonVersion}/img/champion/${c.id}.png" 
                                  alt="${c.name}" class="tier-champ-icon">
-                            <div class="tier-champ-name">${c.name}</div>
-                            <div class="tier-champ-wr ${c.wr >= 52 ? 'good' : c.wr <= 48 ? 'bad' : ''}">${c.wr}%</div>
+                            <div class="tier-champ-info">
+                                <div class="tier-champ-name">${c.name}</div>
+                                <div class="tier-champ-stats">
+                                    <span class="tier-champ-wr ${c.wr >= 52 ? 'good' : c.wr <= 48 ? 'bad' : ''}">${c.wr}%</span>
+                                    <span class="tier-champ-games">${formatNumber(c.games)}G</span>
+                                </div>
+                                <div class="tier-champ-pick">PR: ${c.pickRate}%</div>
+                            </div>
                         </div>
                     `).join('')}
                 </div>
@@ -1385,45 +1845,94 @@ function generateTierListData(role) {
     const allChamps = Object.values(state.champions);
     if (!allChamps.length) return {};
     
-    // Asignar roles típicos a campeones (simplificado)
-    const roleChamps = {
-        top: ['Aatrox', 'Camille', 'Darius', 'Fiora', 'Garen', 'Gwen', 'Illaoi', 'Irelia', 'Jax', 'Jayce', 'Kayle', 'Kennen', 'Kled', 'Malphite', 'Mordekaiser', 'Nasus', 'Olaf', 'Ornn', 'Pantheon', 'Poppy', 'Quinn', 'Renekton', 'Riven', 'Rumble', 'Sett', 'Shen', 'Singed', 'Sion', 'Teemo', 'Tryndamere', 'Urgot', 'Vayne', 'Vladimir', 'Volibear', 'Wukong', 'Yorick'],
-        jungle: ['Amumu', 'Diana', 'Ekko', 'Elise', 'Evelynn', 'Fiddlesticks', 'Gragas', 'Graves', 'Hecarim', 'Ivern', 'JarvanIV', 'Karthus', 'Kayn', 'Khazix', 'Kindred', 'LeeSin', 'Lillia', 'MasterYi', 'Nidalee', 'Nocturne', 'Nunu', 'Olaf', 'Rammus', 'RekSai', 'Rengar', 'Sejuani', 'Shaco', 'Shyvana', 'Skarner', 'Taliyah', 'Udyr', 'Vi', 'Viego', 'Warwick', 'XinZhao', 'Zac'],
-        mid: ['Ahri', 'Akali', 'Anivia', 'Annie', 'Aurelion Sol', 'Azir', 'Cassiopeia', 'Corki', 'Diana', 'Ekko', 'Fizz', 'Galio', 'Irelia', 'Kassadin', 'Katarina', 'LeBlanc', 'Lissandra', 'Lux', 'Malzahar', 'Neeko', 'Orianna', 'Qiyana', 'Ryze', 'Sylas', 'Syndra', 'Taliyah', 'Talon', 'TwistedFate', 'Veigar', 'VelKoz', 'Vex', 'Viktor', 'Vladimir', 'Xerath', 'Yasuo', 'Yone', 'Zed', 'Ziggs', 'Zoe'],
-        adc: ['Aphelios', 'Ashe', 'Caitlyn', 'Draven', 'Ezreal', 'Jhin', 'Jinx', 'KaiSa', 'Kalista', 'KogMaw', 'Lucian', 'MissFortune', 'Samira', 'Senna', 'Sivir', 'Tristana', 'Twitch', 'Varus', 'Vayne', 'Xayah', 'Zeri'],
-        support: ['Alistar', 'Bard', 'Blitzcrank', 'Brand', 'Braum', 'Janna', 'Karma', 'Leona', 'Lulu', 'Lux', 'Milio', 'Morgana', 'Nami', 'Nautilus', 'Pyke', 'Rakan', 'Rell', 'Renata', 'Senna', 'Seraphine', 'Sona', 'Soraka', 'Swain', 'Tahm Kench', 'Taric', 'Thresh', 'Yuumi', 'Zilean', 'Zyra']
+    // Datos de campeones por rol con estadisticas aproximadas del meta actual
+    const championMeta = {
+        top: {
+            S: ['Ambessa', 'Ksante', 'Jax', 'Camille', 'Aatrox'],
+            A: ['Fiora', 'Riven', 'Gwen', 'Renekton', 'Darius', 'Mordekaiser', 'Sett', 'Gragas'],
+            B: ['Garen', 'Malphite', 'Ornn', 'Shen', 'Volibear', 'Trundle', 'Rumble', 'Kennen', 'Jayce', 'Quinn'],
+            C: ['Teemo', 'Singed', 'Yorick', 'Illaoi', 'Kayle', 'Nasus', 'Cho\'Gath', 'Urgot'],
+            D: ['Tryndamere', 'Gangplank', 'Heimerdinger', 'Akshan']
+        },
+        jungle: {
+            S: ['Viego', 'LeeSin', 'Elise', 'Nidalee', 'Rek\'Sai'],
+            A: ['Graves', 'Khazix', 'Hecarim', 'JarvanIV', 'Vi', 'XinZhao', 'Nocturne', 'Warwick'],
+            B: ['Amumu', 'Rammus', 'Sejuani', 'Zac', 'Nunu', 'Diana', 'Ekko', 'Evelynn', 'Shyvana'],
+            C: ['MasterYi', 'Shaco', 'Rengar', 'Kindred', 'Taliyah', 'Lillia', 'Fiddlesticks'],
+            D: ['Ivern', 'Karthus', 'Skarner', 'Udyr']
+        },
+        mid: {
+            S: ['Aurora', 'Syndra', 'Orianna', 'Ahri', 'Leblanc'],
+            A: ['Sylas', 'Viktor', 'Azir', 'Akali', 'Zed', 'Yasuo', 'Yone', 'Corki'],
+            B: ['Lux', 'Vex', 'Malzahar', 'TwistedFate', 'Galio', 'Kassadin', 'Cassiopeia', 'Anivia', 'Xerath'],
+            C: ['Annie', 'Veigar', 'Brand', 'Ziggs', 'Lissandra', 'Neeko', 'Taliyah'],
+            D: ['Ryze', 'Aurelion Sol', 'ASol']
+        },
+        adc: {
+            S: ['Jinx', 'Jhin', 'Caitlyn', 'Ashe', 'Ezreal'],
+            A: ['Kai\'Sa', 'Vayne', 'Lucian', 'MissFortune', 'Draven', 'Tristana', 'Xayah'],
+            B: ['Samira', 'Zeri', 'Sivir', 'Aphelios', 'Varus', 'Twitch', 'Kog\'Maw'],
+            C: ['Kalista', 'Nilah'],
+            D: []
+        },
+        support: {
+            S: ['Thresh', 'Nautilus', 'Leona', 'Blitzcrank', 'Rakan'],
+            A: ['Lulu', 'Nami', 'Janna', 'Milio', 'Rell', 'Alistar', 'Braum'],
+            B: ['Morgana', 'Karma', 'Senna', 'Pyke', 'Bard', 'Soraka', 'Renata'],
+            C: ['Yuumi', 'Sona', 'Taric', 'Zilean', 'Seraphine'],
+            D: ['Tahm Kench']
+        }
     };
     
-    let champsToShow = allChamps;
-    if (role !== 'all') {
-        const roleNames = roleChamps[role] || [];
-        champsToShow = allChamps.filter(c => roleNames.some(name => c.id.includes(name) || c.name.includes(name)));
+    // WR base por tier (simulado pero realista)
+    const wrBase = { S: 53, A: 51, B: 50, C: 48, D: 46 };
+    const prBase = { S: 12, A: 8, B: 5, C: 3, D: 1.5 };
+    const gamesBase = { S: 80000, A: 50000, B: 30000, C: 15000, D: 8000 };
+    
+    const result = { S: [], A: [], B: [], C: [], D: [] };
+    
+    const rolesToProcess = role === 'all' ? Object.keys(championMeta) : [role];
+    const addedChamps = new Set();
+    
+    for (const currentRole of rolesToProcess) {
+        const roleData = championMeta[currentRole];
+        if (!roleData) continue;
+        
+        for (const tier of Object.keys(result)) {
+            const champNames = roleData[tier] || [];
+            
+            for (const champName of champNames) {
+                if (addedChamps.has(champName)) continue;
+                
+                const champ = allChamps.find(c => 
+                    c.name === champName || 
+                    c.id === champName || 
+                    c.name.includes(champName) ||
+                    champName.includes(c.name)
+                );
+                
+                if (champ && !addedChamps.has(champ.id)) {
+                    addedChamps.add(champ.id);
+                    
+                    // Agregar variacion para que no sean todos iguales
+                    const wrVariation = (Math.random() - 0.5) * 2;
+                    const prVariation = (Math.random() - 0.5) * 2;
+                    const gamesVariation = Math.random() * 0.3;
+                    
+                    result[tier].push({
+                        ...champ,
+                        wr: (wrBase[tier] + wrVariation).toFixed(1),
+                        pickRate: (prBase[tier] + prVariation).toFixed(1),
+                        games: Math.floor(gamesBase[tier] * (1 + gamesVariation))
+                    });
+                }
+            }
+        }
     }
     
-    // Shuffle y asignar a tiers con winrates simulados
-    const shuffled = [...champsToShow].sort(() => Math.random() - 0.5);
-    
-    const tierCounts = { S: 5, A: 8, B: 10, C: 10, D: 7 };
-    const result = {};
-    let idx = 0;
-    
-    const wrRanges = {
-        S: [53, 56],
-        A: [51, 53],
-        B: [49, 51],
-        C: [47, 49],
-        D: [44, 47]
-    };
-    
-    for (const tier of Object.keys(tierCounts)) {
-        result[tier] = [];
-        for (let i = 0; i < tierCounts[tier] && idx < shuffled.length; i++, idx++) {
-            const wr = Math.floor(Math.random() * (wrRanges[tier][1] - wrRanges[tier][0] + 1)) + wrRanges[tier][0];
-            result[tier].push({
-                ...shuffled[idx],
-                wr
-            });
-        }
+    // Ordenar cada tier por WR descendente
+    for (const tier of Object.keys(result)) {
+        result[tier].sort((a, b) => parseFloat(b.wr) - parseFloat(a.wr));
     }
     
     return result;
@@ -1432,7 +1941,7 @@ function generateTierListData(role) {
 // ==================== MULTI-SEARCH ====================
 async function doMultiSearch() {
     const input = $('#multisearch-input')?.value;
-    const region = $('#multisearch-region')?.value || 'la1';
+    const region = $('#multisearch-region')?.value || 'la2';
     const container = $('#multisearch-results');
     
     if (!input?.trim() || !container) return;
@@ -1545,7 +2054,7 @@ async function doMultiSearch() {
             el.classList.remove('loading');
             el.innerHTML = `
                 <div class="multisearch-header">
-                    <div style="width: 48px; height: 48px; background: var(--bg-hover); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;">❌</div>
+                    <div style="width: 48px; height: 48px; background: var(--bg-hover); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></div>
                     <div class="multisearch-info">
                         <div class="multisearch-name">${p.name}#${p.tag}</div>
                         <div class="multisearch-rank" style="color: var(--loss);">No encontrado</div>

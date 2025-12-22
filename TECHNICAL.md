@@ -10,6 +10,8 @@ Referencia detallada de cada archivo del proyecto, su propósito y estructura in
 
 Módulo de configuración centralizada. Utiliza Pydantic Settings para gestión de variables de entorno con validación de tipos.
 
+> Usa `SettingsConfigDict` para declarar `env_file=".env"` y omitir claves desconocidas, evitando warnings en Pydantic 2.x.
+
 #### Clase `Settings`
 
 | Atributo | Tipo | Descripción |
@@ -38,7 +40,9 @@ Cliente HTTP asíncrono para comunicación con Riot Games API. Implementa todos 
 |--------|-------------|
 | `_get_platform_url(region)` | Genera URL para endpoints de plataforma (v4) |
 | `_get_regional_url(routing)` | Genera URL para endpoints regionales (v5) |
-| `_request(url, params)` | Ejecuta petición GET con manejo de errores HTTP |
+| `_request(url, params)` | Ejecuta petición GET reutilizando un `httpx.AsyncClient` persistente |
+
+El cliente mantiene una sesión HTTP con límites (`max_connections=40`, `max_keepalive_connections=20`) y expone `aclose()` para liberar recursos durante el apagado de la app.
 
 **Endpoints Account-V1:**
 
@@ -66,7 +70,7 @@ Cliente HTTP asíncrono para comunicación con Riot Games API. Implementa todos 
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| `get_current_game` | `/lol/spectator/v5/active-games/by-summoner/{puuid}` | Partida en vivo |
+| `get_current_game` | `/lol/spectator/v5/active-games/by-summoner/{summonerId}` | Partida en vivo (requiere Summoner ID) |
 | `get_featured_games` | `/lol/spectator/v5/featured-games` | Partidas destacadas |
 
 **Endpoints League-V4:**
@@ -95,7 +99,12 @@ Servidor FastAPI principal. Define todos los endpoints REST y sirve archivos est
 #### Configuración
 
 ```python
-app = FastAPI(title="LoL Statistics App", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app):
+       yield
+       await riot_client.aclose()
+
+app = FastAPI(title="LoL Statistics App", version="1.0.0", lifespan=lifespan)
 ```
 
 - CORS habilitado para desarrollo
@@ -122,6 +131,10 @@ app = FastAPI(title="LoL Statistics App", version="1.0.0")
 - `/match/{match_id}` - Detalles de partida
 - `/match/{match_id}/details` - Partida con análisis
 - `/live/{summoner_id}` - Partida en vivo
+
+Helper destacado:
+
+- `fetch_match_details(match_ids, routing, concurrency=5)` descarga partidas en paralelo con un `asyncio.Semaphore`, reintenta en caso de recibir 429 y conserva el orden original de los IDs.
 
 **Rankings:**
 - `/league/challenger` - Ladder Challenger
@@ -169,8 +182,8 @@ Los datos se almacenan en memoria después de la primera petición para evitar l
 | Método | Descripción |
 |--------|-------------|
 | `get_champion_image_url(name)` | URL de splash art |
-| `get_champion_square_url(name, version)` | URL de icono cuadrado |
-| `get_profile_icon_url(id, version)` | URL de icono de perfil |
+| `get_champion_square_url(name, version=None)` | URL de icono cuadrado usando la versión cacheada |
+| `get_profile_icon_url(id, version=None)` | URL de icono de perfil sincronizado con el último parche |
 
 ---
 
@@ -201,16 +214,13 @@ Retorna diccionario con:
 | `champion_stats` | dict | Estadísticas por campeón |
 | `kda_ratio` | float | Ratio KDA global |
 
-**Método `get_champion_recommendations(stats)`**
+**Generación de recomendaciones**
 
-Genera lista de campeones recomendados basado en:
-- Winrate superior al 50%
-- Mínimo de 3 partidas jugadas
-- KDA promedio positivo
-
-**Método `analyze_player_performance(puuid, matches)`**
-
-Análisis completo que combina estadísticas con recomendaciones de mejora.
+`generate_recommendations(stats, current_game_info=None)` produce:
+- Pool recomendado de campeones (según winrate/KDA).
+- Fortalezas y áreas de mejora (visión, muertes, CS por minuto, etc.).
+- Consejos de estilo por rol principal.
+- Tips situacionales cuando `current_game_info` describe una partida en vivo.
 
 ---
 
@@ -258,6 +268,18 @@ Estructura HTML principal de la aplicación. Diseño single-page con secciones i
 **Modal:**
 - Reutilizado para detalles de partida, campeón, item
 - Cierre por click en backdrop, botón X, o tecla Escape
+
+---
+
+## Tests
+
+El módulo `tests/test_backend.py` contiene pruebas unitarias que mockean las respuestas de Riot y Data Dragon para validar:
+
+- Generación de recomendaciones (`/api/recommendations/{puuid}`).
+- Conversión PUUID → Summoner ID en `/api/player/{puuid}/live` y enriquecimiento de campeones.
+- Utilidades de `DataDragonService` y el helper `fetch_match_details` (orden estable y backoff ante 429).
+
+Se ejecutan con `python -m pytest tests -vv`.
 
 ---
 

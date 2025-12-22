@@ -347,7 +347,7 @@ body {
 
 .profile-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
     margin-bottom: 24px;
@@ -382,6 +382,89 @@ body {
 .profile-meta { color: var(--text-secondary); font-size: 0.875rem; margin-top: 4px; }
 .profile-actions { display: flex; gap: 12px; }
 
+.profile-overview {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 240px;
+}
+
+.profile-metric {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    min-width: 180px;
+}
+
+.profile-metric-rank {
+    padding: 16px;
+    min-width: 320px;
+}
+
+.metric-rank-layout {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.metric-emblem {
+    width: 72px;
+    height: 72px;
+    min-width: 72px;
+    min-height: 72px;
+    object-fit: contain;
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+}
+
+#profile-elo-emblem {
+    width: 72px;
+    height: 72px;
+    min-width: 72px;
+    min-height: 72px;
+}
+
+.metric-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-top: 4px;
+}
+
+.metric-sub {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.metric-winrate-inline {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.metric-winrate-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    color: var(--text-secondary);
+}
+
+.metric-winrate-value {
+    font-weight: 700;
+    color: var(--text);
+}
+
 /* ===== Ranked ===== */
 .ranked-row {
     display: grid;
@@ -404,10 +487,12 @@ body {
 .ranked-card:hover { border-color: var(--border-light); }
 
 .ranked-emblem {
-    width: 72px;
-    height: 72px;
+    width: 56px;
+    height: 56px;
     object-fit: contain;
     flex-shrink: 0;
+    background: transparent;
+    border: none;
 }
 
 .ranked-info { display: flex; flex-direction: column; gap: 2px; }
@@ -439,6 +524,13 @@ body {
     margin-bottom: 12px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.sidebar-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: -4px;
+    margin-bottom: 12px;
 }
 
 /* Quick Stats */
@@ -483,6 +575,7 @@ body {
     gap: 8px;
     font-size: 0.75rem;
     color: var(--text-muted);
+    flex-wrap: wrap;
 }
 
 .champ-stat-wr { font-weight: 600; }
@@ -490,6 +583,25 @@ body {
 .champ-stat-wr.bad { color: var(--loss); }
 
 .champ-stat-kda { color: var(--text-secondary); }
+.champ-stat-games { color: var(--text-secondary); }
+
+.champ-stat-extra {
+    display: flex;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.champion-stats-toggle {
+    margin-top: 12px;
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 0;
+    text-align: left;
+}
 
 /* Mastery List */
 .mastery-list { display: flex; flex-direction: column; gap: 8px; }
@@ -829,7 +941,7 @@ body {
 
 .ranking-row {
     display: grid;
-    grid-template-columns: 50px 48px 1fr 100px 80px;
+    grid-template-columns: 50px 40px 1fr 140px 90px 70px;
     align-items: center;
     padding: 12px 16px;
     gap: 12px;
@@ -853,14 +965,31 @@ body {
 
 .rank-emblem { width: 32px; height: 32px; object-fit: contain; }
 
-.rank-player { display: flex; flex-direction: column; min-width: 0; }
+.rank-player {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+.rank-player-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-card);
+}
+.rank-player-info { display: flex; flex-direction: column; min-width: 0; }
 .rank-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rank-name a { color: inherit; text-decoration: none; }
 .rank-name a:hover { color: var(--accent); }
 .rank-tier-label { font-size: 0.7rem; color: var(--text-muted); }
 
+.rank-games { font-size: 0.85rem; color: var(--text-secondary); text-align: center; }
 .rank-lp { font-weight: 600; color: var(--gold); text-align: right; }
-.rank-wr { color: var(--text-muted); font-size: 0.875rem; text-align: right; }
+.rank-wr { font-size: 0.875rem; text-align: right; }
+.rank-wr.good { color: var(--win); }
+.rank-wr.bad { color: var(--loss); }
 
 /* ===== Modal ===== */
 .modal {
@@ -1204,7 +1333,7 @@ body {
 .tierlist-container {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
 }
 
 .tier-row {
@@ -1214,68 +1343,119 @@ body {
     background: var(--bg-card);
     border-radius: var(--radius);
     border: 1px solid var(--border);
+    align-items: stretch;
+}
+
+.tier-label-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 80px;
 }
 
 .tier-label {
-    width: 50px;
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 1.5rem;
-    border-radius: var(--radius-sm);
+    font-size: 1.4rem;
+    border-radius: var(--radius);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.tier-description {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.2;
+    max-width: 80px;
 }
 
 .tier-champions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 10px;
     flex: 1;
+    align-content: flex-start;
 }
 
 .tier-champ {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 8px;
+    gap: 6px;
+    padding: 10px 8px;
     background: var(--bg-hover);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     cursor: pointer;
     transition: all var(--transition);
-    width: 72px;
+    width: 90px;
+    border: 1px solid transparent;
 }
 
 .tier-champ:hover {
-    transform: translateY(-3px);
-    background: var(--bg-card);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translateY(-4px);
+    background: var(--bg-dark);
+    border-color: var(--accent);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
 
 .tier-champ-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-sm);
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius);
     border: 2px solid var(--border);
+    transition: border-color var(--transition);
+}
+
+.tier-champ:hover .tier-champ-icon {
+    border-color: var(--accent);
+}
+
+.tier-champ-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    width: 100%;
 }
 
 .tier-champ-name {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
+    font-weight: 500;
     text-align: center;
-    color: var(--text-secondary);
+    color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
 }
 
+.tier-champ-stats {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 0.65rem;
+}
+
 .tier-champ-wr {
-    font-size: 0.6rem;
     font-weight: 600;
 }
 
 .tier-champ-wr.good { color: var(--win); }
 .tier-champ-wr.bad { color: var(--loss); }
+
+.tier-champ-games {
+    color: var(--text-muted);
+}
+
+.tier-champ-pick {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+}
 
 /* Multi-Search Section */
 .multisearch-section { animation: fadeIn 0.3s ease; }
@@ -1479,6 +1659,20 @@ body {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
+}
+
+.spell-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.build-spell {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-card);
 }
 
 .build-item {

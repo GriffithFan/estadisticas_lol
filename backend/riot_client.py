@@ -15,6 +15,11 @@ class RiotAPIClient:
             "X-Riot-Token": self.api_key,
             "Accept": "application/json"
         }
+        self._client = httpx.AsyncClient(
+            headers=self.headers.copy(),
+            timeout=httpx.Timeout(30.0),
+            limits=httpx.Limits(max_connections=40, max_keepalive_connections=20)
+        )
     
     def _get_platform_url(self, region: str) -> str:
         """Obtiene la URL base para una región de plataforma"""
@@ -30,33 +35,31 @@ class RiotAPIClient:
     
     async def _request(self, url: str, params: Optional[dict] = None) -> dict:
         """Realiza una petición GET a la API"""
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(
-                    url, 
-                    headers=self.headers, 
-                    params=params,
-                    timeout=30.0
-                )
-                response.raise_for_status()
-                return {"success": True, "data": response.json()}
-            except httpx.HTTPStatusError as e:
-                error_messages = {
-                    400: "Petición inválida",
-                    401: "API Key no válida",
-                    403: "Acceso prohibido",
-                    404: "No encontrado",
-                    429: "Límite de peticiones excedido",
-                    500: "Error interno del servidor de Riot",
-                    503: "Servicio no disponible"
-                }
-                return {
-                    "success": False, 
-                    "error": error_messages.get(e.response.status_code, f"Error HTTP {e.response.status_code}"),
-                    "status_code": e.response.status_code
-                }
-            except httpx.RequestError as e:
-                return {"success": False, "error": f"Error de conexión: {str(e)}"}
+        try:
+            response = await self._client.get(url, params=params)
+            response.raise_for_status()
+            return {"success": True, "data": response.json()}
+        except httpx.HTTPStatusError as e:
+            error_messages = {
+                400: "Petición inválida",
+                401: "API Key no válida",
+                403: "Acceso prohibido",
+                404: "No encontrado",
+                429: "Límite de peticiones excedido",
+                500: "Error interno del servidor de Riot",
+                503: "Servicio no disponible"
+            }
+            return {
+                "success": False, 
+                "error": error_messages.get(e.response.status_code, f"Error HTTP {e.response.status_code}"),
+                "status_code": e.response.status_code
+            }
+        except httpx.RequestError as e:
+            return {"success": False, "error": f"Error de conexión: {str(e)}"}
+
+    async def aclose(self) -> None:
+        """Cierra el cliente HTTP persistente"""
+        await self._client.aclose()
     
     # ==================== ACCOUNT-V1 ====================
     
@@ -134,11 +137,11 @@ class RiotAPIClient:
     
     # ==================== SPECTATOR-V5 ====================
     
-    async def get_current_game(self, puuid: str, region: str = "la1") -> dict:
+    async def get_current_game(self, summoner_id: str, region: str = "la1") -> dict:
         """
-        Obtiene información de la partida actual en vivo
+        Obtiene información de la partida actual en vivo (requiere Summoner ID)
         """
-        url = f"{self._get_platform_url(region)}/lol/spectator/v5/active-games/by-summoner/{puuid}"
+        url = f"{self._get_platform_url(region)}/lol/spectator/v5/active-games/by-summoner/{summoner_id}"
         return await self._request(url)
     
     async def get_featured_games(self, region: str = "la1") -> dict:
@@ -152,9 +155,16 @@ class RiotAPIClient:
     
     async def get_league_entries_by_summoner(self, summoner_id: str, region: str = "la1") -> dict:
         """
-        Obtiene las entradas de liga (rangos) de un invocador
+        Obtiene las entradas de liga (rangos) de un invocador por Summoner ID
         """
         url = f"{self._get_platform_url(region)}/lol/league/v4/entries/by-summoner/{summoner_id}"
+        return await self._request(url)
+
+    async def get_league_entries_by_puuid(self, puuid: str, region: str = "la1") -> dict:
+        """
+        Obtiene las entradas de liga (rangos) de un invocador por PUUID
+        """
+        url = f"{self._get_platform_url(region)}/lol/league/v4/entries/by-puuid/{puuid}"
         return await self._request(url)
     
     async def get_challenger_league(self, queue: str = "RANKED_SOLO_5x5", region: str = "la1") -> dict:

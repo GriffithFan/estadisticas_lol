@@ -196,7 +196,7 @@ class RecommendationService:
         # Recomendaciones de pool de campeones
         if stats.get("best_champions"):
             recommendations["champion_pool"] = [
-                f"🏆 {champ['champion']}: {champ['winrate']}% WR en {champ['games']} partidas"
+                f"{champ['champion']}: {champ['winrate']}% WR en {champ['games']} partidas"
                 for champ in stats["best_champions"][:3]
             ]
         
@@ -209,64 +209,64 @@ class RecommendationService:
         
         if avg_deaths > 6:
             recommendations["improvement_areas"].append(
-                "⚠️ Muertes altas: Trabaja en tu posicionamiento y mapeo"
+                "Muertes altas: Trabaja en tu posicionamiento y mapeo"
             )
         
         if avg_vision < 15:
             recommendations["improvement_areas"].append(
-                "👁️ Visión baja: Compra más wards y usa el trinket activamente"
+                "Vision baja: Compra mas wards y usa el trinket activamente"
             )
         
         cs_per_min = avg_cs / max(avg_duration, 1)
         if cs_per_min < 6 and stats.get("preferred_role") in ["TOP", "MID", "BOTTOM"]:
             recommendations["improvement_areas"].append(
-                "🌾 CS bajo: Practica farmeo en modo práctica (objetivo: 7+ CS/min)"
+                "CS bajo: Practica farmeo en modo practica (objetivo: 7+ CS/min)"
             )
         
         # Fortalezas
         if kda >= 3:
             recommendations["strengths"].append(
-                f"✨ Excelente KDA: {kda} - Juegas de forma consistente"
+                f"Excelente KDA: {kda} - Juegas de forma consistente"
             )
         
         winrate = stats.get("winrate", 50)
         if winrate >= 55:
             recommendations["strengths"].append(
-                f"🔥 Winrate alto: {winrate}% - ¡Sigue así!"
+                f"Winrate alto: {winrate}% - Sigue asi!"
             )
         
         if avg_vision >= 25:
             recommendations["strengths"].append(
-                "👁️ Gran control de visión"
+                "Gran control de vision"
             )
         
         # Tips de estilo de juego
         preferred_role = stats.get("preferred_role", "")
         role_tips = {
             "TOP": [
-                "💪 Como toplaner, gestiona bien las olas para crear presión",
-                "🗺️ Usa Teleport para impactar otras líneas",
-                "⚔️ Conoce tus matchups y power spikes"
+                "Como toplaner, gestiona bien las olas para crear presion",
+                "Usa Teleport para impactar otras lineas",
+                "Conoce tus matchups y power spikes"
             ],
             "JUNGLE": [
-                "🗺️ Trackea al jungler enemigo constantemente",
-                "⏰ Controla los tiempos de objetivos (Drake, Herald, Baron)",
-                "🎯 Identifica qué línea tiene más carry potential"
+                "Trackea al jungler enemigo constantemente",
+                "Controla los tiempos de objetivos (Drake, Herald, Baron)",
+                "Identifica que linea tiene mas carry potential"
             ],
             "MID": [
-                "🌍 Roamea cuando pushees la ola",
-                "👁️ Wardea para evitar ganks del jungler",
-                "⚡ Aprovecha tus power spikes para hacer plays"
+                "Roamea cuando pushees la ola",
+                "Wardea para evitar ganks del jungler",
+                "Aprovecha tus power spikes para hacer plays"
             ],
             "BOTTOM": [
-                "🎯 Farmea de forma segura en early game",
-                "👥 Coordina con tu support para tradeos",
-                "📍 Posiciónate bien en teamfights"
+                "Farmea de forma segura en early game",
+                "Coordina con tu support para tradeos",
+                "Posicionate bien en teamfights"
             ],
             "UTILITY": [
-                "👁️ Mantén visión constante en objetivos",
-                "🛡️ Protege a tu ADC y carries",
-                "🎯 Busca engages cuando tengas ventaja numérica"
+                "Manten vision constante en objetivos",
+                "Protege a tu ADC y carries",
+                "Busca engages cuando tengas ventaja numerica"
             ]
         }
         
@@ -299,9 +299,9 @@ class RecommendationService:
                 enemy_team.append(p)
         
         # Tips generales basados en composición
-        tips.append("🎮 Tips para esta partida:")
-        tips.append("• Comunica con tu equipo los objetivos prioritarios")
-        tips.append("• Adapta tu build según la composición enemiga")
+        tips.append("Tips para esta partida:")
+        tips.append("- Comunica con tu equipo los objetivos prioritarios")
+        tips.append("- Adapta tu build segun la composicion enemiga")
         
         return tips
     

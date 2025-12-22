@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LoL Stats - Estadísticas de League of Legends</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/styles.css?v=4">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -45,7 +46,7 @@
                 <form id="header-search-form" class="search-form header-search hidden">
                     <select id="header-region" class="region-select">
                         <option value="la1">LAN</option>
-                        <option value="la2">LAS</option>
+                        <option value="la2" selected>LAS</option>
                         <option value="na1">NA</option>
                         <option value="euw1">EUW</option>
                         <option value="eun1">EUNE</option>
@@ -77,14 +78,14 @@
             <section id="hero-section" class="hero active">
                 <div class="hero-bg"></div>
                 <div class="hero-content">
-                    <div class="hero-badge">⚡ Parche 25.24</div>
+                    <div class="hero-badge">Parche 25.24</div>
                     <h1 class="hero-title">Domina tu <span class="gradient-text">partida</span></h1>
                     <p class="hero-desc">Estadísticas detalladas, historial de partidas, tier lists y más para mejorar tu gameplay</p>
                     
                     <form id="hero-search-form" class="search-form hero-search">
                         <select id="selected-region" class="region-select">
                             <option value="la1">LAN</option>
-                            <option value="la2">LAS</option>
+                            <option value="la2" selected>LAS</option>
                             <option value="na1">NA</option>
                             <option value="euw1">EUW</option>
                             <option value="eun1">EUNE</option>
@@ -148,6 +149,25 @@
                         <div class="profile-info">
                             <h1 class="profile-name"><span id="profile-name">Jugador</span><span id="profile-tag" class="tag">#TAG</span></h1>
                             <p class="profile-meta"><span id="profile-region">Región</span> · <span id="profile-update">Actualizado ahora</span></p>
+                        </div>
+                    </div>
+                    <div class="profile-overview">
+                        <div class="profile-metric profile-metric-rank">
+                            <div class="metric-rank-layout">
+                                <img id="profile-elo-emblem" class="metric-emblem" src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-iron.png" alt="Rank emblem">
+                                <div>
+                                    <span class="metric-label">Elo principal</span>
+                                    <span id="profile-elo" class="metric-value">-</span>
+                                    <span id="profile-elo-details" class="metric-sub">Sin datos</span>
+                                    <div class="metric-winrate-inline">
+                                        <span class="metric-label">Winrate temporada</span>
+                                        <div class="metric-winrate-row">
+                                            <span id="profile-overall-winrate" class="metric-sub metric-winrate-value">-</span>
+                                            <span id="profile-overall-record" class="metric-sub">0W · 0L</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="profile-actions">
@@ -217,7 +237,9 @@
                         <!-- Top Campeones (Estadísticas de temporada) -->
                         <div class="sidebar-card">
                             <h3 class="sidebar-title">Campeones más jugados</h3>
+                            <p class="sidebar-subtitle" id="champion-stats-season"></p>
                             <div id="champion-stats-list" class="champion-stats-list"></div>
+                            <button id="champion-stats-toggle" class="champion-stats-toggle hidden" type="button">Ver más</button>
                         </div>
 
                         <!-- Maestría de Campeones -->
@@ -284,7 +306,7 @@
                     <div class="filters-row">
                         <select id="ranking-region" class="filter-select">
                             <option value="la1">LAN</option>
-                            <option value="la2">LAS</option>
+                            <option value="la2" selected>LAS</option>
                             <option value="na1">NA</option>
                             <option value="euw1">EUW</option>
                             <option value="eun1">EUNE</option>
@@ -339,13 +361,13 @@
             <!-- Multi-Search Section -->
             <section id="multisearch-section" class="multisearch-section hidden">
                 <div class="section-header">
-                    <h2 class="section-title">👥 Multi-Search</h2>
+                    <h2 class="section-title">Multi-Search</h2>
                     <p class="section-desc">Busca varios jugadores a la vez - perfecto para champ select</p>
                 </div>
                 <div class="multisearch-form">
                     <select id="multisearch-region" class="region-select">
                         <option value="la1">LAN</option>
-                        <option value="la2">LAS</option>
+                        <option value="la2" selected>LAS</option>
                         <option value="na1">NA</option>
                         <option value="euw1">EUW</option>
                         <option value="eun1">EUNE</option>

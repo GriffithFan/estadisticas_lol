@@ -3,16 +3,17 @@ Configuración de la aplicación
 """
 import os
 from dotenv import load_dotenv
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
 
 
 class Settings(BaseSettings):
     """Configuración principal de la aplicación"""
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     
     # Riot API
-    riot_api_key: str = os.getenv("RIOT_API_KEY", "")
+    riot_api_key: str = os.getenv("RIOT_API_KEY", "RGAPI-b5e1e43c-2e58-43c6-a01a-b446fdea48ee")
     default_region: str = os.getenv("DEFAULT_REGION", "la1")
     default_routing: str = os.getenv("DEFAULT_ROUTING", "americas")
     
@@ -60,8 +61,5 @@ class Settings(BaseSettings):
         "vn2": "Vietnam"
     }
     
-    class Config:
-        env_file = ".env"
-
 
 settings = Settings()

@@ -91,25 +91,33 @@ class DataDragonService:
             self._runes = response.json()
             return self._runes
     
+    def _resolve_version(self, version: Optional[str] = None) -> str:
+        """Obtiene la versión a utilizar para recursos estáticos"""
+        return version or self._version or "latest"
+    
     def get_champion_image_url(self, champion_name: str) -> str:
         """Genera URL de imagen de campeón"""
         return f"{self.base_url}/cdn/img/champion/splash/{champion_name}_0.jpg"
     
-    def get_champion_square_url(self, champion_name: str, version: str = "15.24.1") -> str:
+    def get_champion_square_url(self, champion_name: str, version: Optional[str] = None) -> str:
         """Genera URL de imagen cuadrada de campeón"""
-        return f"{self.base_url}/cdn/{version}/img/champion/{champion_name}.png"
+        resolved_version = self._resolve_version(version)
+        return f"{self.base_url}/cdn/{resolved_version}/img/champion/{champion_name}.png"
     
-    def get_item_image_url(self, item_id: int, version: str = "15.24.1") -> str:
+    def get_item_image_url(self, item_id: int, version: Optional[str] = None) -> str:
         """Genera URL de imagen de item"""
-        return f"{self.base_url}/cdn/{version}/img/item/{item_id}.png"
+        resolved_version = self._resolve_version(version)
+        return f"{self.base_url}/cdn/{resolved_version}/img/item/{item_id}.png"
     
-    def get_spell_image_url(self, spell_name: str, version: str = "15.24.1") -> str:
+    def get_spell_image_url(self, spell_name: str, version: Optional[str] = None) -> str:
         """Genera URL de imagen de hechizo"""
-        return f"{self.base_url}/cdn/{version}/img/spell/{spell_name}.png"
+        resolved_version = self._resolve_version(version)
+        return f"{self.base_url}/cdn/{resolved_version}/img/spell/{spell_name}.png"
     
-    def get_profile_icon_url(self, icon_id: int, version: str = "15.24.1") -> str:
+    def get_profile_icon_url(self, icon_id: int, version: Optional[str] = None) -> str:
         """Genera URL de imagen de icono de perfil"""
-        return f"{self.base_url}/cdn/{version}/img/profileicon/{icon_id}.png"
+        resolved_version = self._resolve_version(version)
+        return f"{self.base_url}/cdn/{resolved_version}/img/profileicon/{icon_id}.png"
 
 
 # Instancia global del servicio

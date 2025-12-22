@@ -1,8 +1,16 @@
 # LoL Statistics
 
-Aplicación web para consulta y análisis de estadísticas de League of Legends. Consume la API oficial de Riot Games para proporcionar información detallada sobre jugadores, partidas, campeones y rankings.
+Aplicacion web para consulta y analisis de estadisticas de League of Legends. Consume la API oficial de Riot Games para proporcionar informacion detallada sobre jugadores, partidas, campeones y rankings.
 
-## Características
+## Novedades v2.0
+
+- Frontend Vue.js 3 con TypeScript
+- Backend Express con TypeScript
+- Sistema de Routing con Vue Router
+- Estado Global con Pinia
+- Diseno Responsivo
+
+## Caracteristicas
 
 ### Perfil de Jugador
 - Búsqueda por Riot ID (Nombre#Tag)
@@ -45,12 +53,54 @@ Aplicación web para consulta y análisis de estadísticas de League of Legends.
 - Filtrado por región y cola
 - LP mínimo para cada tier
 
+## Estructura del Proyecto
+
+```
+estadisticas_lol/
+  backend/              # Backend Python (FastAPI)
+  backend-express/      # Backend Node.js (Express + TypeScript)
+  frontend/             # Frontend original (Vanilla JS)
+  frontend-vue/         # Frontend Vue.js 3 + TypeScript
+  tests/                # Tests
+```
+
 ## Requisitos
 
+### Para Frontend Vue.js + Backend Express
+- Node.js 18+
+- npm o yarn
+
+### Para Backend FastAPI (Original)
 - Python 3.10+
 - API Key de Riot Games (desarrollo o producción)
 
 ## Instalación
+
+### Opcion 1: Vue.js + Express (Recomendado)
+
+1. Clonar el repositorio:
+```bash
+git clone https://github.com/GriffithFan/estadisticas_lol.git
+cd estadisticas_lol
+```
+
+2. Instalar y ejecutar Backend Express:
+```bash
+cd backend-express
+npm install
+npm run dev
+```
+El backend estará en `http://localhost:3001`
+
+3. En otra terminal, instalar y ejecutar Frontend Vue.js:
+```bash
+cd frontend-vue
+npm install
+npm run dev
+```
+El frontend estará en `http://localhost:3000`
+
+### Opcion 2: Backend FastAPI (Original)
 
 1. Clonar el repositorio:
 ```bash
@@ -82,6 +132,16 @@ uvicorn backend.main:app --reload --port 8000
 ```
 
 6. Abrir en navegador: `http://localhost:8000`
+
+## Pruebas
+
+El proyecto incluye pruebas automatizadas para los endpoints críticos del backend (recomendaciones, partida en vivo y utilidades de Data Dragon). Para ejecutarlas:
+
+```bash
+python -m pytest tests -vv
+```
+
+Las pruebas mockean las dependencias externas (Riot API y Data Dragon) para ofrecer feedback rápido sin necesidad de llamadas reales.
 
 ## Variables de Entorno
 
