@@ -3,6 +3,23 @@ import { ref, computed } from 'vue'
 import { api } from '@/services/api'
 import type { Summoner, RankedInfo, Match, Champion } from '@/types'
 
+interface PlayerSearchResponse {
+  account: {
+    puuid: string
+    gameName: string
+    tagLine: string
+  }
+  summoner: {
+    id: string
+    accountId: string
+    puuid: string
+    profileIconId: number
+    summonerLevel: number
+  }
+  profile_icon_url: string
+  region: string
+}
+
 export const useSummonerStore = defineStore('summoner', () => {
   // State
   const summoner = ref<Summoner | null>(null)
@@ -25,10 +42,8 @@ export const useSummonerStore = defineStore('summoner', () => {
   // Actions
   async function fetchDDragonVersion() {
     try {
-      const versions = await api.get<string[]>('/versions')
-      if (versions.length > 0) {
-        ddragonVersion.value = versions[0]
-      }
+      const data = await api.get<{ version: string }>('/ddragon/version')
+      ddragonVersion.value = data.version
     } catch (e) {
       console.error('Error fetching DDragon version:', e)
     }
@@ -36,7 +51,7 @@ export const useSummonerStore = defineStore('summoner', () => {
 
   async function fetchChampions() {
     try {
-      const data = await api.get<{ champions: Record<string, Champion> }>('/champions')
+      const data = await api.get<{ champions: Record<string, Champion> }>('/ddragon/champions')
       champions.value = data.champions
     } catch (e) {
       console.error('Error fetching champions:', e)
@@ -48,15 +63,26 @@ export const useSummonerStore = defineStore('summoner', () => {
     error.value = null
 
     try {
-      const data = await api.get<Summoner>(
-        `/summoner/${region}/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`
+      // Usar la ruta correcta del backend
+      const data = await api.get<PlayerSearchResponse>(
+        `/player/search?game_name=${encodeURIComponent(gameName)}&tag_line=${encodeURIComponent(tagLine)}&region=${region}`
       )
-      summoner.value = data
       
-      // Fetch ranked info
-      if (data.puuid) {
-        await fetchRankedInfo(region, data.puuid)
-        await fetchMatches(region, data.puuid)
+      // Combinar datos de account y summoner
+      summoner.value = {
+        id: data.summoner.id,
+        accountId: data.summoner.accountId,
+        puuid: data.account.puuid,
+        gameName: data.account.gameName,
+        tagLine: data.account.tagLine,
+        profileIconId: data.summoner.profileIconId,
+        summonerLevel: data.summoner.summonerLevel
+      }
+      
+      // Fetch ranked info and matches
+      if (data.account.puuid) {
+        await fetchRankedInfo(region, data.account.puuid)
+        await fetchMatches(region, data.account.puuid)
       }
     } catch (e: any) {
       error.value = e.message || 'Error al buscar invocador'
@@ -68,8 +94,8 @@ export const useSummonerStore = defineStore('summoner', () => {
 
   async function fetchRankedInfo(region: string, puuid: string) {
     try {
-      const data = await api.get<RankedInfo[]>(`/ranked/${region}/${puuid}`)
-      rankedInfo.value = data
+      const data = await api.get<{ ranked: RankedInfo[] }>(`/player/${puuid}/ranked?region=${region}`)
+      rankedInfo.value = data.ranked || []
     } catch (e) {
       console.error('Error fetching ranked info:', e)
       rankedInfo.value = []
@@ -79,12 +105,12 @@ export const useSummonerStore = defineStore('summoner', () => {
   async function fetchMatches(region: string, puuid: string, start = 0, count = 10) {
     try {
       const data = await api.get<{ matches: Match[] }>(
-        `/matches/${region}/${puuid}?start=${start}&count=${count}`
+        `/player/${puuid}/matches?region=${region}&start=${start}&count=${count}`
       )
       if (start === 0) {
-        matches.value = data.matches
+        matches.value = data.matches || []
       } else {
-        matches.value = [...matches.value, ...data.matches]
+        matches.value = [...matches.value, ...(data.matches || [])]
       }
     } catch (e) {
       console.error('Error fetching matches:', e)
