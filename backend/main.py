@@ -23,13 +23,18 @@ from backend.services.champion_builds import (
     get_keystone_info,
     get_secondary_tree_name
 )
+from backend.services.cache import cache, cached, CacheTTL
 from backend.config import settings
 
 # Crear aplicación FastAPI con lifespan
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Startup: conectar Redis
+    await cache.connect()
     yield
+    # Shutdown: desconectar
+    await cache.disconnect()
     await riot_client.aclose()
 
 

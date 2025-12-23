@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     
     # Riot API
-    riot_api_key: str = os.getenv("RIOT_API_KEY", "RGAPI-b5e1e43c-2e58-43c6-a01a-b446fdea48ee")
+    riot_api_key: str = os.getenv("RIOT_API_KEY", "RGAPI-e3831bd5-e3b4-4d76-aa95-572e727d23ef")
     default_region: str = os.getenv("DEFAULT_REGION", "la1")
     default_routing: str = os.getenv("DEFAULT_ROUTING", "americas")
     

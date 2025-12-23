@@ -8,15 +8,22 @@
 - [x] Backend Express TypeScript (alternativo)
 - [x] Integración Riot API
 - [x] Diseño responsive profesional
+- [x] TanStack Query (Vue Query)
+- [x] Zod (validación de schemas)
+- [x] VueUse
+- [x] Vitest configurado
+- [x] Redis cache service
+- [x] Dockerfile para deploy
+- [x] Railway config
 
 ---
 
 ## Pendientes de Implementar
 
 ### 1. Base de Datos - Redis
-- [ ] Configurar Redis para caché de datos de Riot API
-- [ ] Implementar TTL para datos de invocadores (5-10 min)
-- [ ] Cachear datos de campeones/items (24h)
+- [x] Configurar Redis para caché de datos de Riot API
+- [x] Implementar TTL para datos de invocadores (5-10 min)
+- [x] Cachear datos de campeones/items (24h)
 - [ ] Rate limiting con Redis
 - [ ] Sesiones de usuario
 
@@ -56,12 +63,12 @@ npm install jsonwebtoken bcryptjs
 ---
 
 ### 3. Testing - Vitest
-- [ ] Configurar Vitest en frontend-vue
-- [ ] Tests unitarios para composables
-- [ ] Tests de componentes con Vue Test Utils
+- [x] Configurar Vitest en frontend-vue
+- [x] Tests unitarios para composables
+- [x] Tests de componentes con Vue Test Utils
 - [ ] Tests de stores Pinia
-- [ ] Mocks para API calls
-- [ ] Coverage reports
+- [x] Mocks para API calls
+- [x] Coverage reports
 
 **Paquetes:**
 ```bash
@@ -87,8 +94,8 @@ export default defineConfig({
 ---
 
 ### 4. Deploy - Railway
-- [ ] Configurar railway.toml para backend Python
-- [ ] Configurar Dockerfile si es necesario
+- [x] Configurar railway.toml para backend Python
+- [x] Configurar Dockerfile si es necesario
 - [ ] Variables de entorno en Railway
 - [ ] Base de datos Redis en Railway
 - [ ] CI/CD automático desde GitHub

@@ -4,7 +4,7 @@ dotenv.config();
 
 export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
-  riotApiKey: process.env.RIOT_API_KEY || 'RGAPI-b5e1e43c-2e58-43c6-a01a-b446fdea48ee',
+  riotApiKey: process.env.RIOT_API_KEY || 'RGAPI-e3831bd5-e3b4-4d76-aa95-572e727d23ef',
   defaultRegion: process.env.DEFAULT_REGION || 'la1',
   defaultRouting: process.env.DEFAULT_ROUTING || 'americas',
   
